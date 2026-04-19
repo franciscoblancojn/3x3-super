@@ -8,7 +8,7 @@ export const PageDoc = () => {
         <div className="page-doc">
 
             {/* 🧾 HEADER */}
-            <h1>📘 Documentación</h1>
+            <h1>📘 3x3-Super</h1>
 
             <section>
                 <p><strong>Tablero:</strong> 7x7</p>

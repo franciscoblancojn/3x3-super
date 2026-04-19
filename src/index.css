@@ -106,3 +106,7 @@ body {
   display: grid;
   gap: 2rem;
 }
+.page-doc .ficha-description{
+  break-inside: avoid;
+  page-break-inside: avoid; /* compatibilidad */
+}
