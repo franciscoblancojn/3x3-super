@@ -29,13 +29,13 @@
 ⚠️ **Nota:** Los efectos pueden ser anulados en cualquier momento con **Negador**.
 
 📄 Ver reglas completas en PDF:
-👉 [Abrir PDF](./src/page/doc/game-3x3-super-doc.pdf)
+👉 [Abrir PDF](./doc/doc.pdf)
 ---------
 📄 Ver Fichas para Imprimir parte frontal:
-👉 [Abrir PDF](./src/page/print/front/game-3x3-super-front.pdf)
+👉 [Abrir PDF](./doc/front.pdf)
 ---------
 📄 Ver Fichas para Imprimir parte tracera:
-👉 [Abrir PDF](./src/page/print/back/game-3x3-super-back.pdf)
+👉 [Abrir PDF](./doc/back.pdf)
 ---------
 🧩 Fichas
 ---------
