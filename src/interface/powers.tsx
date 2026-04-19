@@ -12,7 +12,7 @@ export enum IPowers {
     Muro = "Muro",
     Negador = "Negador",
     Peso = "Peso",
-    Procector = "Procector",
+    Protector = "Protector",
     Trampa_Lineal = "Trampa_Lineal",
     Trampa_Simple = "Trampa_Simple",
 }

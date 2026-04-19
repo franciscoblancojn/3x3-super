@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { IAction } from "./action";
 import type { IPowers } from "./powers";
 
@@ -12,5 +13,5 @@ export interface IFicha {
         [IFichaAction, 0, IFichaAction],
         [IFichaAction, IFichaAction, IFichaAction]
     ][]
-    decription: string,
+    decription: string | ReactNode,
 }

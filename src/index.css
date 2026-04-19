@@ -77,3 +77,32 @@ body {
 .print-content-fichas.back {
 
 }
+
+.page-doc{
+  width: 1200px;
+  max-width: 100%;
+  padding: 1rem;
+  margin: auto;
+  min-height: 100dvh;
+
+}
+.page-doc .variaciones{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+
+}
+.page-doc h3,
+.page-doc p{
+  margin-top: 0;
+  margin-bottom: .2rem;
+  line-height: 1;
+
+}
+.page-doc .variaciones .ficha{
+  --size:2cm;
+}
+.page-doc .fichas-list{
+  display: grid;
+  gap: 2rem;
+}

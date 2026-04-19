@@ -13,7 +13,7 @@ export const FICHAS_MANO : IFicha[] = [
                 [1,1,1],
             ]
         ],
-        decription:"Bloquea cualquier activacion de efecto. La ficha seleccionada se comporta como Ficha sin efecto.",
+        decription:"Anula un efecto. La ficha seleccionada se comporta como Ficha sin efecto.",
     },
 ]
 export const FICHAS_ACTIVACION : IFicha[] = [
@@ -32,10 +32,10 @@ export const FICHAS_ACTIVACION : IFicha[] = [
                 [0,1,0],
             ],
         ],
-        decription:"Duplica la ficha en una direccion. Evita ser destruida en 3 en linea.",
+        decription:"Se duplica en una dirección. Sobrevive al 3 en linea.",
     },
     {
-        power:IPowers.Procector,
+        power:IPowers.Protector,
         action:IAction.ACTIVACION,
         variations:[
             [
@@ -49,7 +49,7 @@ export const FICHAS_ACTIVACION : IFicha[] = [
                 [1,0,0],
             ],
         ],
-        decription:"Evita que una ficha que apunte sea destruida en 3 en linea.",
+        decription:"Protege una ficha de ser destruida por 3 en línea.",
     },
 ]
 export const FICHAS_DESTRUCCION : IFicha[] = [
@@ -73,7 +73,7 @@ export const FICHAS_DESTRUCCION : IFicha[] = [
                 [1,0,0],
             ],
         ],
-        decription:"Destrulle las fichas a las que apunte.",
+        decription:"Destruye las fichas señaladas.",
     },
     {
         power:IPowers.Trampa_Lineal,
@@ -90,7 +90,7 @@ export const FICHAS_DESTRUCCION : IFicha[] = [
                 [0,0,0],
             ],
         ],
-        decription:"Destrulle las fichas de la linea a la que apunte.",
+        decription:"Arrasa toda la línea señalada.",
     },
     {
         power:IPowers.Muro,
@@ -102,7 +102,11 @@ export const FICHAS_DESTRUCCION : IFicha[] = [
                 [0,0,0],
             ],
         ],
-        decription:"Se voltea simbolizando un muro. Esta ficha no puede ser movida por Peso. Solo puede existir un muro a la ves, al crearce otro muro, el actual es removido del tablero. El muro bloquea efectos de destruccion en linea, y no se ve afectado por efectos de destruccion. La ficha puede ser usada para 3 en linea, el muro no.",
+        decription : <>
+            Inamovible. Se voltea simbolizando un muro.
+            <br/>
+            Muro: Inamovible e inmune a destrucción.  Bloquea efectos en línea. Solo puede existir un muro, al crearce otro, el actual es removido del tablero. La ficha puede ser usada para 3 en linea, el muro no.
+        </>,
     },
 ]
 export const FICHAS_INSTANTANEA : IFicha[] = [
@@ -126,7 +130,7 @@ export const FICHAS_INSTANTANEA : IFicha[] = [
                 [1,0,0],
             ],
         ],
-        decription:"Destrulle las fichas a las que apunte.",
+        decription:"Destruye las fichas señaladas.",
     },
     {
         power:IPowers.Eliminacion_Linea,
@@ -143,7 +147,7 @@ export const FICHAS_INSTANTANEA : IFicha[] = [
                 [0,0,0],
             ],
         ],
-        decription:"Destrulle las fichas de la linea a la que apunte.",
+        decription:"Destruye toda la línea señalada.",
     },
     {
         power:IPowers.Francotirador,
@@ -155,7 +159,7 @@ export const FICHAS_INSTANTANEA : IFicha[] = [
                 [0,0,0],
             ],
         ],
-        decription:"Destrulle 1 ficha seleccionada.",
+        decription:"Elimina una ficha a elección.",
     },
     {
         power:IPowers.Peso,
@@ -167,7 +171,7 @@ export const FICHAS_INSTANTANEA : IFicha[] = [
                 [0,0,0],
             ],
         ],
-        decription:"Mueve todas las fichas del tablero en direccion a donde apunte hasta no poder moverce mas.",
+        decription:"Empuja todas las fichas en la dirección indicada hasta el límite.",
     },
 ]
 export const FICHAS_TURNO : IFicha[] = [
@@ -181,7 +185,7 @@ export const FICHAS_TURNO : IFicha[] = [
                 [0,0,0],
             ]
         ],
-        decription:"Si la casilla donde apunta esta vacia y tiene una ficha sin efecto en la mano, puede colocar a ficha sin efecto a donde apunta. Si la casilla donde apunta esta llena, destrulle dicha ficha. Gira 90 grados al finalizar efecto.",
+        decription:"Si apunta a vacío, coloca una ficha sin efecto de la mano. Si apunta a ficha, la destruye. Luego gira.",
     },
     {
         power:IPowers.Germen,
@@ -193,7 +197,7 @@ export const FICHAS_TURNO : IFicha[] = [
                 [1,0,1],
             ]
         ],
-        decription:"Si una casilla donde apunta esta llena y tiene una ficha sin efecto en la mano, puede destruir la ficha y colocar la ficha sin efecto.",
+        decription:"Infecta: destruye una ficha y la reemplaza por una sin efecto de la mano.",
     },
     {
         power:IPowers.Corredor,
@@ -210,7 +214,7 @@ export const FICHAS_TURNO : IFicha[] = [
                 [0,0,1],
             ],
         ],
-        decription:"Se mueve en una dirreccion donde apunta, si la casilla donde se mueve esta llena, destrulle la ficha. Durante su movimiento es inmune a efecto de destruccion. No puede moverce a casillas con muros o fichas muro.",
+        decription:"Avanza en su dirección. Destruye al impactar. Inmune al moverse. No atraviesa muros.",
     },
     {
         power:IPowers.Incendio,
@@ -227,7 +231,7 @@ export const FICHAS_TURNO : IFicha[] = [
                 [1,0,1],
             ],
         ],
-        decription:"Destrulle una ficha a donde apunte, en caso de no tener fichas para destruir, esta ficha es destruida.",
+        decription:"Quema una ficha. Si no hay objetivo, se destrulle.",
     },
 ]
 
@@ -243,7 +247,7 @@ export const FICHAS_SIN_EFECTO : IFicha[] = [
                 [0,0,0],
             ]
         ],
-        decription:"",
+        decription:"Ficha básica. Sin poder.",
     },
 ]
 export const FICHAS : IFicha[] = [
