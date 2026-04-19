@@ -62,12 +62,11 @@ body {
   align-items: flex-start;
   justify-content: center;
   gap: 0.05cm;
-  padding: 0.1cm;
+  padding: 0.2cm;
   width: 100%;
   min-height: 100dvh;
   background: white;
   min-height: auto;
-  padding: 0;
   page-break-before: always;
 }
 @page {
