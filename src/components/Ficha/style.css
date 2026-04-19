@@ -46,6 +46,9 @@
 .ficha-efecto.deg-0-2{
   transform: rotateZ(45deg);
 }
+.ficha-efecto.deg-2-1{
+  transform: rotateZ(180deg);
+}
 .ficha-efecto.deg-2-0{
   transform: rotateZ(-135deg);
 }
