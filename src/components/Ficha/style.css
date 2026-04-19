@@ -38,3 +38,16 @@
   position: absolute;
   inset: 0;
 }
+
+.ficha-efecto.deg-0-0{
+  transform: rotateZ(-45deg);
+}
+.ficha-efecto.deg-0-2{
+  transform: rotateZ(45deg);
+}
+.ficha-efecto.deg-2-0{
+  transform: rotateZ(-135deg);
+}
+.ficha-efecto.deg-2-2{
+  transform: rotateZ(135deg);
+}

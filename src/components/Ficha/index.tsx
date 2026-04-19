@@ -1,4 +1,5 @@
 import type { IFicha } from "../../interface/ficha"
+import { IPowers } from "../../interface/powers"
 import { IUsersColors, type IUsers } from "../../interface/users"
 
 import "./style.css"
@@ -57,8 +58,13 @@ export const Ficha = ({ action, power, variation, user,back=false }: FichaProps)
 
                                     </div>
                                 }
+                                const giro = [
+                                    IPowers.Eliminacion_Simple,
+                                    IPowers.Eliminacion_Linea,
+                                    IPowers.Corredor,
+                                ].includes(power) ? `deg-${i}-${j}` : ""
                                 return <div
-                                    className="ficha-efecto"
+                                    className={`ficha-efecto ${giro}`}
                                     dangerouslySetInnerHTML={{ __html: PROWER_SVG }}
                                 >
 
