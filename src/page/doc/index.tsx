@@ -80,6 +80,7 @@ export const PageDoc = () => {
                                 {ficha.variations.map((v, j) => (
                                     <Ficha
                                         key={`${i}-${j}`}
+                                        // useImg={true}
                                         {...ficha}
                                         variation={v}
                                         user={IUsers.Alianza}

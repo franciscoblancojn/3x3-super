@@ -7,30 +7,39 @@ import "./style.css"
 export interface FichaProps extends IFicha {
     user: IUsers
     variation: IFicha['variations'][number]
-    back?:boolean
+    back?: boolean
+    useImg?: boolean
 }
 
-export const Ficha = ({ action, power, variation, user,back=false }: FichaProps) => {
+export const Ficha = ({ useImg = false, power, variation, user, back = false }: FichaProps) => {
     const USERS = import.meta.glob('/src/assets/users/*.svg', {
         as: 'raw',
         eager: true,
         import: 'default'
     });
-    const USERS_SVG = USERS[`/src/assets/users/${user}.svg`];
-    const Back = USERS[`/src/assets/users/Back.svg`];
+    const getImg = (svg: any) => {
+        return useImg ? `<img src="data:image/svg+xml;utf8,${encodeURIComponent(`${svg}`.replaceAll("currentColor",IUsersColors[user]))}"/>` : svg;
+    }
+    const USER_ITEM = USERS[`/src/assets/users/${user}.svg`];
+    const USERS_SVG = getImg(USER_ITEM);
+
+
+    const BACK_ITEM = USERS[`/src/assets/users/Back.svg`];
+    const BACK_SVG = getImg(BACK_ITEM);
 
     const PROWERS = import.meta.glob('/src/assets/powers/*.svg', {
         as: 'raw',
         eager: true,
         import: 'default'
     });
-    const PROWER_SVG = PROWERS[`/src/assets/powers/${power}.svg`];
+    const PROWER_ITEM = PROWERS[`/src/assets/powers/${power}.svg`];
+    const PROWER_SVG = getImg(PROWER_ITEM);
 
 
     return <>
         <div
             className="ficha"
-            style={{color:IUsersColors[user]}}
+            style={{ color: IUsersColors[user] }}
         >
             {
                 variation.map((row, i) => {
@@ -38,12 +47,12 @@ export const Ficha = ({ action, power, variation, user,back=false }: FichaProps)
                         {
                             row.map((x, j) => {
                                 if (i == 1 && j == 1) {
-                                    if(back){
-                                    return <div
-                                        className="ficha-user"
-                                        dangerouslySetInnerHTML={{ __html: Back }}
-                                    >
-                                    </div>
+                                    if (back) {
+                                        return <div
+                                            className="ficha-user"
+                                            dangerouslySetInnerHTML={{ __html: BACK_SVG }}
+                                        >
+                                        </div>
                                     }
                                     return <div
                                         className="ficha-user"
