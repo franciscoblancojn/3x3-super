@@ -7,6 +7,7 @@ import { PagePrint } from './page/print';
 import { PageDoc } from './page/doc/index.tsx';
 import { PagePrintFront } from './page/print/front/index.tsx';
 import { PagePrintBack } from './page/print/back/index.tsx';
+import { PagePrintTablero } from './page/print/tablero/index.tsx';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -16,6 +17,7 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/print" element={<PagePrint />} />
         <Route path="/print/front" element={<PagePrintFront />} />
         <Route path="/print/back" element={<PagePrintBack />} />
+        <Route path="/print/tablero" element={<PagePrintTablero />} />
         <Route path="/doc" element={<PageDoc />} />
       </Routes>
     </BrowserRouter>

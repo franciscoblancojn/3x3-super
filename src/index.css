@@ -58,11 +58,11 @@ body {
 .print-content-fichas {
   display: flex;
   flex-wrap: wrap;
-  align-content: flex-start;
-  align-items: flex-start;
+  align-content: center;
+  align-items: center;
   justify-content: center;
-  gap: 0.05cm;
-  padding: 0.2cm;
+  gap: 1px;
+  padding: 0.4cm 0.2cm;
   width: 100%;
   min-height: 100dvh;
   background: white;
@@ -70,9 +70,27 @@ body {
   page-break-before: always;
 }
 @page {
-  padding: 0.1cm;
-  width: calc(calc( 4 / 3) * 21.5cm);
+  padding:  0.3cm;
+  width: calc(calc( 4 / 3) * 22cm);
   height: calc(calc( 4 / 3) * 28cm);
+}
+.print-content-fichas.tablero {
+  background: black;
+  padding: .2cm;
+  gap: .2cm;
+  width: auto;
+  display: grid;
+  grid-template-columns: repeat(7,1fr);
+  grid-template-rows: repeat(7,1fr);
+}
+.print-content-fichas-content{
+  display: flex;
+  background: #fff;
+}
+.print-content-fichas.tablero .ficha {
+  border-radius: 0;
+  --color:#fff !important;
+  --size:4.5cm;
 }
 
 .print-content-fichas.back {
