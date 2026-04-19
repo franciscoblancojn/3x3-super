@@ -60,8 +60,8 @@ body {
   flex-wrap: wrap;
   align-content: flex-start;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.1cm;
+  justify-content: center;
+  gap: 0.05cm;
   padding: 0.1cm;
   width: 100%;
   min-height: 100dvh;
@@ -71,7 +71,9 @@ body {
   page-break-before: always;
 }
 @page {
-  padding: 0.5cm;
+  padding: 0.1cm;
+  width: calc(calc( 4 / 3) * 21.5cm);
+  height: calc(calc( 4 / 3) * 28cm);
 }
 
 .print-content-fichas.back {
@@ -109,4 +111,12 @@ body {
 .page-doc .ficha-description{
   break-inside: avoid;
   page-break-inside: avoid; /* compatibilidad */
+  border-radius: 1rem;
+  border:1px solid #76737e;
+  padding: 1rem;
+}
+.page-doc .fichas-list{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
 }

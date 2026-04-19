@@ -39,7 +39,7 @@ export const Ficha = ({ useImg = false, power, variation, user, back = false }: 
     return <>
         <div
             className="ficha"
-            style={{ color: IUsersColors[user] }}
+            style={{ "--color": IUsersColors[user] } as any}
         >
             {
                 variation.map((row, i) => {

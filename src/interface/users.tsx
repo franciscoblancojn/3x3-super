@@ -6,7 +6,8 @@ export enum IUsers {
     Legion = "Legion",
     Luna = "Luna",
     Nasa = "Nasa",
-    Sol = "Sol"
+    Sol = "Sol",
+    Iglecia = "Iglecia",
 }
 
 export const IUsersColors: {
@@ -18,5 +19,6 @@ export const IUsersColors: {
     Legion: "#dc3545",
     Luna: "#0dcaf0",
     Nasa: "#6c757d",
-    Sol: "#198754"
+    Sol: "#198754",
+    Iglecia: "#ad25b9ff",
 }
