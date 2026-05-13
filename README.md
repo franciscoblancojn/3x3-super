@@ -3,7 +3,7 @@
 
 **Tablero:** 7x7
 
-**Jugadores:** 2 - 7
+**Jugadores:** 2 - 8
 
 **Objetivo:** Alcanzar 5 puntos
 

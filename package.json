@@ -8,7 +8,7 @@
     "node": ">=20.19.0 || >=22.12.0"
   },
   "scripts": {
-    "dev": "bash -c 'source ~/.nvm/nvm.sh && nvm use 22.12 && vite'",
+    "dev": "bash bin/dev.sh",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
