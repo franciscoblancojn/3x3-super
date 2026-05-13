@@ -89,6 +89,7 @@ export function createInitialState(): GameState {
     logs: [],
     scoreToWin: 5,
     highlightCells: [],
+    scoredThisTurn: false,
   }
 }
 
@@ -314,14 +315,15 @@ function resolveEffectWithTarget(state: GameState, row: number, col: number): Ga
 }
 
 function processTurnEffects(state: GameState): GameState {
-  const board = state.board
   const player = state.players[state.currentPlayerIndex]
-  const effects: PendingEffect[] = []
+  const newBoard = state.board.map(r => r.map(c => c ? { ...c } : null))
+  const logs: string[] = [...state.logs]
   const turnOrder = [IPowers.Destructor, IPowers.Germen, IPowers.Corredor, IPowers.Incendio]
+  let hasEffects = false
   for (const power of turnOrder) {
     for (let r = 0; r < 7; r++) {
       for (let c = 0; c < 7; c++) {
-        const cell = board[r][c]
+        const cell = newBoard[r][c]
         if (!cell || cell.user !== player.user || cell.isWall) continue
         if (cell.piece.power !== power) continue
         if (cell.turnPlaced === state.turnNumber) continue
@@ -332,24 +334,20 @@ function processTurnEffects(state: GameState): GameState {
             for (const d of dirs) {
               const nr = r + d.dr, nc = c + d.dc
               if (nr < 0 || nr >= 7 || nc < 0 || nc >= 7) continue
-              const target = board[nr][nc]
+              const target = newBoard[nr][nc]
               if (!target) {
-                effects.push({
-                  id: `destructor-place-${r}-${c}`,
-                  description: `Destructor colocó ficha sin efecto en [${nr + 1}, ${nc + 1}]`,
-                  sourcePos: { row: r, col: c }, sourceUser: player.user,
-                  targets: [], needsTargetSelection: false, availableTargets: [],
-                  piecesToPlace: [{ position: { row: nr, col: nc }, piece: FICHAS_SIN_EFECTO[0], user: player.user, variationIndex: 0 }],
-                })
+                newBoard[nr][nc] = {
+                  piece: FICHAS_SIN_EFECTO[0], user: player.user,
+                  variationIndex: 0, turnPlaced: state.turnNumber, isWall: false, direction: 0,
+                }
+                logs.push(`Destructor colocó ficha sin efecto en [${nr + 1}, ${nc + 1}]`)
+                hasEffects = true
               } else if (!target.isWall) {
-                effects.push({
-                  id: `destructor-destroy-${r}-${c}`,
-                  description: `Destructor destruyó ficha en [${nr + 1}, ${nc + 1}]`,
-                  sourcePos: { row: r, col: c }, sourceUser: player.user,
-                  targets: [{ row: nr, col: nc }], needsTargetSelection: false, availableTargets: [],
-                })
+                newBoard[nr][nc] = null
+                logs.push(`Destructor destruyó ficha en [${nr + 1}, ${nc + 1}]`)
+                hasEffects = true
               }
-              board[r][c]!.direction = (cell.direction + 1) % 4
+              newBoard[r][c]!.direction = (cell.direction + 1) % 4
             }
             break
           }
@@ -357,15 +355,14 @@ function processTurnEffects(state: GameState): GameState {
             for (const d of dirs) {
               const nr = r + d.dr, nc = c + d.dc
               if (nr < 0 || nr >= 7 || nc < 0 || nc >= 7) continue
-              const target = board[nr][nc]
+              const target = newBoard[nr][nc]
               if (target && !target.isWall) {
-                effects.push({
-                  id: `germen-${r}-${c}`,
-                  description: `Germen infectó ficha en [${nr + 1}, ${nc + 1}]`,
-                  sourcePos: { row: r, col: c }, sourceUser: player.user,
-                  targets: [{ row: nr, col: nc }], needsTargetSelection: false, availableTargets: [],
-                  piecesToPlace: [{ position: { row: nr, col: nc }, piece: FICHAS_SIN_EFECTO[0], user: player.user, variationIndex: 0 }],
-                })
+                newBoard[nr][nc] = {
+                  piece: FICHAS_SIN_EFECTO[0], user: player.user,
+                  variationIndex: 0, turnPlaced: state.turnNumber, isWall: false, direction: 0,
+                }
+                logs.push(`Germen infectó ficha en [${nr + 1}, ${nc + 1}]`)
+                hasEffects = true
               }
             }
             break
@@ -374,15 +371,12 @@ function processTurnEffects(state: GameState): GameState {
             for (const d of dirs) {
               let nr = r + d.dr, nc = c + d.dc
               while (nr >= 0 && nr < 7 && nc >= 0 && nc < 7) {
-                const target = board[nr][nc]
+                const target = newBoard[nr][nc]
                 if (target) {
                   if (!target.isWall) {
-                    effects.push({
-                      id: `corredor-${r}-${c}`,
-                      description: `Corredor impactó y destruyó ficha en [${nr + 1}, ${nc + 1}]`,
-                      sourcePos: { row: r, col: c }, sourceUser: player.user,
-                      targets: [{ row: nr, col: nc }], needsTargetSelection: false, availableTargets: [],
-                    })
+                    newBoard[nr][nc] = null
+                    logs.push(`Corredor impactó y destruyó ficha en [${nr + 1}, ${nc + 1}]`)
+                    hasEffects = true
                   }
                   break
                 }
@@ -396,23 +390,19 @@ function processTurnEffects(state: GameState): GameState {
             for (const d of dirs) {
               const nr = r + d.dr, nc = c + d.dc
               if (nr < 0 || nr >= 7 || nc < 0 || nc >= 7) continue
-              const target = board[nr][nc]
+              const target = newBoard[nr][nc]
               if (target && !target.isWall) targets.push({ row: nr, col: nc })
             }
             if (targets.length === 0) {
-              effects.push({
-                id: `incendio-self-${r}-${c}`,
-                description: `Incendio no encontró objetivo y se autodestruyó en [${r + 1}, ${c + 1}]`,
-                sourcePos: { row: r, col: c }, sourceUser: player.user,
-                targets: [{ row: r, col: c }], needsTargetSelection: false, availableTargets: [],
-              })
+              newBoard[r][c] = null
+              logs.push(`Incendio no encontró objetivo y se autodestruyó en [${r + 1}, ${c + 1}]`)
+              hasEffects = true
             } else {
-              effects.push({
-                id: `incendio-${r}-${c}`,
-                description: `Incendio quemó ${targets.length} ficha(s)`,
-                sourcePos: { row: r, col: c }, sourceUser: player.user,
-                targets, needsTargetSelection: false, availableTargets: [],
-              })
+              for (const t of targets) {
+                newBoard[t.row][t.col] = null
+              }
+              logs.push(`Incendio quemó ${targets.length} ficha(s)`)
+              hasEffects = true
             }
             break
           }
@@ -420,10 +410,20 @@ function processTurnEffects(state: GameState): GameState {
       }
     }
   }
-  if (effects.length > 0) {
-    return { ...state, phase: "resolvingEffects", pendingEffects: effects, logs: [...state.logs, `⚡ Efectos de turno de ${player.name}...`] }
+  if (hasEffects) {
+    logs.unshift(`⚡ Efectos de turno de ${player.name}...`)
   }
-  return { ...state, phase: "placing", logs: [...state.logs, `🎯 ${player.name}, coloca una ficha`] }
+  logs.push(`🎯 ${player.name}, coloca una ficha`)
+  return {
+    ...state,
+    board: newBoard,
+    phase: "placing",
+    scoredThisTurn: false,
+    selectedHandPieceIndex: null,
+    pendingEffects: [],
+    highlightCells: [],
+    logs,
+  }
 }
 
 function resolveLine(state: GameState): GameState {
@@ -517,7 +517,7 @@ function resolveLine(state: GameState): GameState {
   const winnerIdx = newPlayers.findIndex(p => p.score >= state.scoreToWin)
   if (winnerIdx >= 0) {
     return {
-      ...state, board: newBoard, players: newPlayers,
+      ...state, board: newBoard, players: newPlayers, scoredThisTurn: true,
       phase: "gameOver", winner: winnerIdx,
       selectedHandPieceIndex: null, pendingEffects: [], highlightCells: [],
       logs: [...logs, `🎉 ¡${newPlayers[winnerIdx].name} ganó la partida!`],
@@ -525,27 +525,47 @@ function resolveLine(state: GameState): GameState {
   }
   if (destructionEffects.length > 0) {
     return {
-      ...state, board: newBoard, players: newPlayers,
+      ...state, board: newBoard, players: newPlayers, scoredThisTurn: true,
       phase: "resolvingEffects", pendingEffects: destructionEffects,
       highlightCells: [], logs,
     }
   }
   return {
-    ...state, board: newBoard, players: newPlayers,
+    ...state, board: newBoard, players: newPlayers, scoredThisTurn: true,
     phase: "endOfTurn" as GameState["phase"], highlightCells: [], logs,
+  }
+}
+
+function advanceFromEmptyEffects(state: GameState): GameState {
+  if (state.pendingEffects.length > 0) return state
+  if (state.phase !== "resolvingEffects") return state
+  const lineResult = state.scoredThisTurn ? null : findThreeInLine(state.board)
+  if (lineResult) {
+    const findName = (u: IUsers) => state.players.find(p => p.user === u)?.name || "alguien"
+    return {
+      ...state, pendingEffects: [],
+      phase: "checkingLine", highlightCells: lineResult.positions,
+      logs: [...state.logs, `¡3 en línea de ${findName(lineResult.user)}!`],
+    }
+  }
+  return {
+    ...state, pendingEffects: [],
+    phase: "endOfTurn" as GameState["phase"],
   }
 }
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "START_GAME": {
-      return {
+      const players = createPlayers(action.playerConfigs)
+      const newState: GameState = {
         ...createInitialState(),
         phase: "startOfTurn",
-        players: createPlayers(action.playerConfigs),
+        players,
         turnNumber: 1,
         logs: ["¡Comienza el juego!"],
       }
+      return processTurnEffects(newState)
     }
     case "SELECT_HAND_PIECE": {
       const player = state.players[state.currentPlayerIndex]
@@ -594,24 +614,26 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const log = `${player.name} colocó ${hp.piece.power.replaceAll("_", " ")} en [${row + 1}, ${col + 1}]`
       if (hp.piece.action === "INSTANTANEA") {
         const effects = buildInstantEffects(newBoard, row, col, hp, player.name, player.user)
-        return {
-          ...state, board: newBoard, players: newPlayers,
-          selectedHandPieceIndex: null,
-          phase: "resolvingEffects", pendingEffects: effects,
-          logs: [...state.logs, log],
+        if (effects.length > 0) {
+          return {
+            ...state, board: newBoard, players: newPlayers, scoredThisTurn: false,
+            selectedHandPieceIndex: null,
+            phase: "resolvingEffects", pendingEffects: effects,
+            logs: [...state.logs, log],
+          }
         }
       }
       const lineResult = findThreeInLine(newBoard)
       if (lineResult) {
         return {
-          ...state, board: newBoard, players: newPlayers,
+          ...state, board: newBoard, players: newPlayers, scoredThisTurn: false,
           selectedHandPieceIndex: null,
           phase: "checkingLine", highlightCells: lineResult.positions,
           logs: [...state.logs, log, `¡3 en línea de ${player.name}!`],
         }
       }
       return {
-        ...state, board: newBoard, players: newPlayers,
+        ...state, board: newBoard, players: newPlayers, scoredThisTurn: false,
         selectedHandPieceIndex: null,
         phase: "endOfTurn" as GameState["phase"],
         logs: [...state.logs, log],
@@ -647,7 +669,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return state
     }
     case "RESOLVED_EFFECT": {
-      if (state.pendingEffects.length === 0) return state
+      if (state.pendingEffects.length === 0) return advanceFromEmptyEffects(state)
       const [current, ...rest] = state.pendingEffects
       if (current.needsTargetSelection) return state
       const newBoard = state.board.map(r => r.map(c => c ? { ...c } : null))
@@ -673,7 +695,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (rest.length > 0) {
         return { ...state, board: newBoard, pendingEffects: rest, logs }
       }
-      const lineResult = findThreeInLine(newBoard)
+      const lineResult = state.scoredThisTurn ? null : findThreeInLine(newBoard)
       if (lineResult) {
         const findName = (u: IUsers) => state.players.find(p => p.user === u)?.name || "alguien"
         return {
@@ -688,6 +710,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       }
     }
     case "NEXT_TURN": {
+      if (state.phase === "startOfTurn") return processTurnEffects(state)
       if (state.phase !== "endOfTurn" && state.phase !== "checkingLine") return state
       if (state.phase === "checkingLine") {
         return resolveLine(state)
@@ -699,6 +722,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         phase: "startOfTurn",
         currentPlayerIndex: nextPlayer,
         turnNumber: nextTurn,
+        scoredThisTurn: false,
         selectedHandPieceIndex: null,
         pendingEffects: [],
         highlightCells: [],

@@ -169,6 +169,11 @@ export function GameBoard() {
               {state.phase === "checkingLine" ? "Resolver 3 en línea" : "Siguiente turno"}
             </button>
           )}
+          {state.phase === "startOfTurn" && (
+            <button className="action-btn" onClick={() => dispatch({ type: "NEXT_TURN" })}>
+              Iniciar turno
+            </button>
+          )}
         </div>
       </div>
 

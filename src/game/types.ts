@@ -64,6 +64,7 @@ export interface GameState {
   logs: string[]
   scoreToWin: number
   highlightCells: Position[]
+  scoredThisTurn: boolean
 }
 
 export type GameAction =
