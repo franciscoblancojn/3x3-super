@@ -71,8 +71,8 @@ body {
 }
 @page {
   padding:  0.3cm;
-  width: calc(calc( 4 / 3) * 22cm);
-  height: calc(calc( 4 / 3) * 28cm);
+  width: calc(calc( 4 / 3) * 20cm);
+  height: calc(calc( 4 / 3) * 26cm);
 }
 .print-content-fichas.tablero {
   background: black;
