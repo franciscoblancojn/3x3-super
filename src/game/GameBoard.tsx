@@ -17,7 +17,7 @@ export function GameBoard() {
   const { state, dispatch } = useGame()
 
   const currentPlayer = state.players[state.currentPlayerIndex]
-  const canPlace = state.phase === "placing" && state.selectedHandPieceIndex !== null
+  const canPlace = state.phase === "placing" && state.selectedHandPieceIndex !== null && state.selectedVariationIndex !== null
 
   function handleCellClick(row: number, col: number) {
     if (state.phase === "waitingForTarget") {
@@ -38,9 +38,27 @@ export function GameBoard() {
       }
       return
     }
+    if (state.phase === "resolvingActivations") {
+      const pe = state.pendingEffects[0]
+      if (pe && pe.needsTargetSelection) {
+        if (pe.availableTargets.some(t => t.row === row && t.col === col)) {
+          dispatch({ type: "SELECT_TARGET", row, col })
+        }
+      }
+      return
+    }
     if (canPlace && !state.board[row][col]) {
       dispatch({ type: "PLACE_PIECE", row, col })
     }
+  }
+
+  function isInAvailableLine(row: number, col: number): boolean {
+    if (state.phase === "choosingLine") {
+      return state.availableLines.some(line =>
+        line.positions.some(p => p.row === row && p.col === col)
+      )
+    }
+    return false
   }
 
   function isHighlighted(row: number, col: number): boolean {
@@ -48,7 +66,7 @@ export function GameBoard() {
   }
 
   function isAvailableTarget(row: number, col: number): boolean {
-    if (state.phase === "waitingForTarget" || state.phase === "resolvingEffects") {
+    if (state.phase === "waitingForTarget" || state.phase === "resolvingEffects" || state.phase === "resolvingActivations") {
       const pe = state.pendingEffects[0]
       if (pe && pe.needsTargetSelection) {
         return pe.availableTargets.some(t => t.row === row && t.col === col)
@@ -67,6 +85,14 @@ export function GameBoard() {
     switch (state.phase) {
       case "startOfTurn":
         return `⏳ Procesando efectos de turno de ${currentPlayer.name}...`
+      case "choosingVariation": {
+        const hp = state.selectedHandPieceIndex !== null ? currentPlayer.hand[state.selectedHandPieceIndex] : null
+        return `🎯 ${currentPlayer.name}, selecciona la forma de ${hp?.piece.power.replaceAll("_", " ") || "la ficha"}`
+      }
+      case "choosingDirection": {
+        const hp = state.selectedHandPieceIndex !== null ? currentPlayer.hand[state.selectedHandPieceIndex] : null
+        return `🎯 ${currentPlayer.name}, selecciona la rotación de ${hp?.piece.power.replaceAll("_", " ") || "la ficha"}`
+      }
       case "placing":
         if (state.selectedHandPieceIndex === null) {
           return `🎯 ${currentPlayer.name}, selecciona una ficha de tu mano`
@@ -74,10 +100,14 @@ export function GameBoard() {
         return `📍 ${currentPlayer.name}, coloca la ficha en el tablero`
       case "resolvingEffects":
         return state.pendingEffects[0]?.description || "⚡ Resolviendo efectos..."
+      case "resolvingActivations":
+        return state.pendingEffects[0]?.description || "⚡ Resolviendo efectos de activación..."
       case "waitingForTarget":
         return state.pendingEffects[0]?.description || "🎯 Selecciona un objetivo"
       case "checkingLine":
         return `🔍 ¡3 en línea! Presiona "Resolver" para procesar`
+      case "choosingLine":
+        return `🔍 ¡Múltiples 3 en línea! Selecciona cuál activar`
       case "endOfTurn":
         return `${currentPlayer.name}, presiona "Siguiente turno" para continuar`
       default:
@@ -86,11 +116,24 @@ export function GameBoard() {
   }
 
   function canResolve(): boolean {
-    if (state.phase === "resolvingEffects" && state.pendingEffects.length > 0) {
+    if ((state.phase === "resolvingEffects" || state.phase === "resolvingActivations") && state.pendingEffects.length > 0) {
       return !state.pendingEffects[0].needsTargetSelection
     }
     return false
   }
+
+  function canSkip(): boolean {
+    if (state.phase === "resolvingEffects" && state.pendingEffects.length > 0) {
+      return state.pendingEffects[0].optional === true
+    }
+    return false
+  }
+
+  function hasEffectsQueue(): boolean {
+    return state.turnEffectQueue.length > 0
+  }
+
+  const selectedHandPiece = state.selectedHandPieceIndex !== null ? currentPlayer.hand[state.selectedHandPieceIndex] : null
 
   return (
     <div className="game-layout">
@@ -121,6 +164,73 @@ export function GameBoard() {
           <div className="turn-info">Turno {state.turnNumber}</div>
         </div>
 
+        {/* Variation chooser overlay */}
+        {state.phase === "choosingVariation" && selectedHandPiece && selectedHandPiece.piece.variations.length > 1 && (
+          <div className="variation-chooser">
+            <h3>Selecciona forma base:</h3>
+            <div className="variation-grid">
+              {selectedHandPiece.piece.variations.map((v, vi) => (
+                <div
+                  key={vi}
+                  className="variation-option"
+                  onClick={() => dispatch({ type: "CHOOSE_VARIATION", index: vi })}
+                >
+                  <Ficha
+                    {...selectedHandPiece.piece}
+                    variation={v}
+                    user={currentPlayer.user}
+                  />
+                  <span>Forma {vi + 1}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Direction/rotation chooser overlay */}
+        {state.phase === "choosingDirection" && selectedHandPiece && (
+          <div className="variation-chooser">
+            <h3>Selecciona rotación:</h3>
+            <div className="variation-grid">
+              {[0, 90, 180, 270].map((deg) => (
+                <div
+                  key={deg}
+                  className="variation-option"
+                  onClick={() => dispatch({ type: "CHOOSE_DIRECTION", direction: deg / 90 })}
+                >
+                  <div style={{ transform: `rotate(${deg}deg)` }}>
+                    <Ficha
+                      {...selectedHandPiece.piece}
+                      variation={selectedHandPiece.piece.variations[0]}
+                      user={currentPlayer.user}
+                    />
+                  </div>
+                  <span>{deg}°</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Line chooser overlay */}
+        {state.phase === "choosingLine" && (
+          <div className="line-chooser">
+            <h3>Selecciona qué 3 en línea activar:</h3>
+            <div className="line-options">
+              {state.availableLines.map((line, li) => (
+                <button
+                  key={li}
+                  className="action-btn primary"
+                  onClick={() => dispatch({ type: "SELECT_LINE", lineIndex: li })}
+                >
+                  Línea de {state.players.find(p => p.user === line.user)?.name || "alguien"}:
+                  [{line.positions.map(p => `${p.row + 1},${p.col + 1}`).join(" → ")}]
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="board-container">
           <div className="board-grid">
             {Array.from({ length: BOARD_SIZE }, (_, r) => (
@@ -129,12 +239,13 @@ export function GameBoard() {
                   const cell = state.board[r][c]
                   const hl = isHighlighted(r, c)
                   const target = isAvailableTarget(r, c)
+                  const inLine = isInAvailableLine(r, c)
                   const isEmpty = canPlace && !cell
 
                   return (
                     <div
                       key={c}
-                      className={`board-cell ${hl ? "highlighted" : ""} ${target ? "targetable" : ""} ${isEmpty ? "empty-slot" : ""} ${cell?.isWall ? "wall" : ""}`}
+                      className={`board-cell ${hl ? "highlighted" : ""} ${target ? "targetable" : ""} ${inLine ? "in-line" : ""} ${isEmpty ? "empty-slot" : ""} ${cell?.isWall ? "wall" : ""}`}
                       onClick={() => handleCellClick(r, c)}
                     >
                       {cell && !cell.isWall && (
@@ -159,19 +270,24 @@ export function GameBoard() {
         </div>
 
         <div className="game-actions">
-          {canResolve() && (
+          {(state.phase === "resolvingEffects" || state.phase === "resolvingActivations") && canResolve() && (
             <button className="action-btn" onClick={() => dispatch({ type: "RESOLVED_EFFECT" })}>
-              Resolver efecto
+              Resolver efecto {hasEffectsQueue() ? `(+${state.turnEffectQueue.length} restantes)` : ""}
             </button>
           )}
-          {(state.phase === "endOfTurn" || state.phase === "checkingLine") && (
+          {canSkip() && (
+            <button className="action-btn secondary" onClick={() => dispatch({ type: "SKIP_EFFECT" })}>
+              Saltar efecto
+            </button>
+          )}
+          {(state.phase === "endOfTurn") && (
             <button className="action-btn primary" onClick={() => dispatch({ type: "NEXT_TURN" })}>
-              {state.phase === "checkingLine" ? "Resolver 3 en línea" : "Siguiente turno"}
+              Siguiente turno
             </button>
           )}
-          {state.phase === "startOfTurn" && (
-            <button className="action-btn" onClick={() => dispatch({ type: "NEXT_TURN" })}>
-              Iniciar turno
+          {state.phase === "checkingLine" && (
+            <button className="action-btn primary" onClick={() => dispatch({ type: "RESOLVE_LINE" })}>
+              Resolver 3 en línea
             </button>
           )}
         </div>
@@ -192,7 +308,7 @@ export function GameBoard() {
                 >
                   <Ficha
                     {...hp.piece}
-                    variation={hp.piece.variations[hp.variationIndex]}
+                    variation={hp.piece.variations[hp.piece.variations.length > 1 ? 0 : 0]}
                     user={currentPlayer.user}
                   />
                   <div className="hand-piece-name">
