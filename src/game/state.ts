@@ -224,33 +224,32 @@ function findThreeInLine(board: BoardGrid): { positions: Position[]; user: IUser
   return all.length > 0 ? all[0] : null
 }
 
-function pushPiecesInDirection(
-  board: BoardGrid, row: number, col: number, dr: number, dc: number
+function pushAllPiecesInDirection(
+  board: BoardGrid, dr: number, dc: number
 ): { piecesToMove: { from: Position; to: Position }[] } {
-  const cells: { r: number; c: number; piece: BoardCell }[] = []
-  let r = row
-  let c = col
-  while (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE) {
-    const cell = board[r][c]
-    if (cell && !cell.isWall) {
-      cells.push({ r, c, piece: cell })
-    } else if (cell?.isWall) {
-      break
+  const allPieces: { r: number; c: number }[] = []
+  for (let r = 0; r < BOARD_SIZE; r++) {
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      const cell = board[r][c]
+      if (cell && !cell.isWall && cell.piece.power !== IPowers.Muro) {
+        allPieces.push({ r, c })
+      }
     }
-    r += dr
-    c += dc
   }
-  if (dr > 0) cells.reverse()
-  else if (dr === 0 && dc > 0) cells.reverse()
+  if (dr > 0) allPieces.sort((a, b) => b.r - a.r)
+  else if (dr < 0) allPieces.sort((a, b) => a.r - b.r)
+  else if (dc > 0) allPieces.sort((a, b) => b.c - a.c)
+  else allPieces.sort((a, b) => a.c - b.c)
+  const originSet = new Set(allPieces.map(p => `${p.r},${p.c}`))
   const piecesToMove: { from: Position; to: Position }[] = []
   const occupied = new Set<string>()
-  for (const cell of cells) {
-    let nr = cell.r + dr
-    let nc = cell.c + dc
+  for (const piece of allPieces) {
+    let nr = piece.r + dr
+    let nc = piece.c + dc
     while (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE) {
       const target = board[nr][nc]
       if (target?.isWall) break
-      if (!board[nr][nc] && !occupied.has(`${nr},${nc}`)) {
+      if ((!board[nr][nc] || originSet.has(`${nr},${nc}`)) && !occupied.has(`${nr},${nc}`)) {
         nr += dr
         nc += dc
       } else {
@@ -259,8 +258,8 @@ function pushPiecesInDirection(
     }
     nr -= dr
     nc -= dc
-    if (nr !== cell.r || nc !== cell.c) {
-      piecesToMove.push({ from: { row: cell.r, col: cell.c }, to: { row: nr, col: nc } })
+    if (nr !== piece.r || nc !== piece.c) {
+      piecesToMove.push({ from: { row: piece.r, col: piece.c }, to: { row: nr, col: nc } })
       occupied.add(`${nr},${nc}`)
     }
   }
@@ -391,7 +390,7 @@ function buildInstantEffects(
     }
     case IPowers.Peso: {
       for (const d of dirs) {
-        const { piecesToMove } = pushPiecesInDirection(board, row, col, d.dr, d.dc)
+        const { piecesToMove } = pushAllPiecesInDirection(board, d.dr, d.dc)
         if (piecesToMove.length > 0) {
           effects.push({
             id: `peso-${row}-${col}`,
@@ -955,21 +954,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           }],
         }
       }
-      if (hp.piece.variations.length > 1) {
-        return {
-          ...state,
-          selectedHandPieceIndex: action.index,
-          selectedVariationIndex: null,
-          selectedDirection: 0,
-          phase: "choosingVariation",
-        }
-      }
       return {
         ...state,
         selectedHandPieceIndex: action.index,
         selectedVariationIndex: 0,
         selectedDirection: 0,
-        phase: "choosingDirection",
+        phase: hp.piece.haveRotate ? "choosingDirection" : "placing",
       }
     }
     case "CHOOSE_VARIATION": {
@@ -1388,6 +1378,44 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "RESOLVE_LINE": {
       if (state.phase !== "checkingLine") return state
       return resolveLine(state)
+    }
+    case "REMOVE_PLAYER": {
+      const removed = state.players[action.playerIndex]
+      if (!removed) return state
+      const newBoard = state.board.map(r => r.map(c => c && c.user === removed.user ? null : c ? { ...c } : null))
+      const newLogs = [...state.logs, `${removed.name} se desconectó y fue eliminado de la partida`]
+      const newPlayers = state.players.filter((_, i) => i !== action.playerIndex)
+      if (newPlayers.length <= 1) {
+        return {
+          ...state,
+          board: newBoard,
+          players: newPlayers,
+          winner: 0,
+          phase: "gameOver",
+          logs: [...newLogs, `¡${newPlayers[0]?.name || "Nadie"} gana! (único jugador restante)`],
+        }
+      }
+      let newCurrentIndex = state.currentPlayerIndex
+      if (action.playerIndex < state.currentPlayerIndex) {
+        newCurrentIndex -= 1
+      } else if (action.playerIndex === state.currentPlayerIndex) {
+        newCurrentIndex = newCurrentIndex % newPlayers.length
+      }
+      return {
+        ...state,
+        board: newBoard,
+        players: newPlayers,
+        currentPlayerIndex: newCurrentIndex,
+        selectedHandPieceIndex: null,
+        selectedVariationIndex: null,
+        selectedDirection: 0,
+        phase: "placing",
+        highlightCells: [],
+        pendingEffects: [],
+        turnEffectQueue: [],
+        afterEffectsPhase: null,
+        logs: newLogs,
+      }
     }
     case "ADD_LOG": {
       return { ...state, logs: [...state.logs, action.message] }

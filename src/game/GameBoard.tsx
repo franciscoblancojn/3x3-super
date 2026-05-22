@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { useGame } from "./GameContext"
 import { Ficha } from "../components/Ficha"
 import { IAction } from "../interface/action"
@@ -13,13 +14,15 @@ const SIN_EFECTO_FICHA = {
   decription: "",
 }
 
-export function GameBoard() {
+export function GameBoard({ playerIndex: myPlayerIndex }: { playerIndex?: number }) {
   const { state, dispatch } = useGame()
 
   const currentPlayer = state.players[state.currentPlayerIndex]
   const canPlace = state.phase === "placing" && state.selectedHandPieceIndex !== null && state.selectedVariationIndex !== null
+  const isMyTurn = myPlayerIndex === undefined || myPlayerIndex === state.currentPlayerIndex
 
   function handleCellClick(row: number, col: number) {
+    if (!isMyTurn) return
     if (state.phase === "waitingForTarget") {
       const pe = state.pendingEffects[0]
       if (pe && pe.needsTargetSelection) {
@@ -76,6 +79,7 @@ export function GameBoard() {
   }
 
   function handleHandClick(index: number) {
+    if (!isMyTurn) return
     if (state.phase === "placing") {
       dispatch({ type: "SELECT_HAND_PIECE", index })
     }
@@ -135,6 +139,9 @@ export function GameBoard() {
 
   const selectedHandPiece = state.selectedHandPieceIndex !== null ? currentPlayer.hand[state.selectedHandPieceIndex] : null
 
+  const [showPlayers, setShowPlayers] = useState(false)
+  const [showLog, setShowLog] = useState(false)
+
   return (
     <div className="game-layout">
       <div className="game-sidebar left-sidebar">
@@ -164,56 +171,82 @@ export function GameBoard() {
           <div className="turn-info">Turno {state.turnNumber}</div>
         </div>
 
-        {/* Variation chooser overlay */}
-        {state.phase === "choosingVariation" && selectedHandPiece && selectedHandPiece.piece.variations.length > 1 && (
-          <div className="variation-chooser">
-            <h3>Selecciona forma base:</h3>
-            <div className="variation-grid">
-              {selectedHandPiece.piece.variations.map((v, vi) => (
-                <div
-                  key={vi}
-                  className="variation-option"
-                  onClick={() => dispatch({ type: "CHOOSE_VARIATION", index: vi })}
-                >
-                  <Ficha
-                    {...selectedHandPiece.piece}
-                    variation={v}
-                    user={currentPlayer.user}
-                  />
-                  <span>Forma {vi + 1}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Direction/rotation chooser overlay */}
-        {state.phase === "choosingDirection" && selectedHandPiece && (
+        {state.phase === "choosingDirection" && selectedHandPiece && isMyTurn && (
           <div className="variation-chooser">
             <h3>Selecciona rotación:</h3>
-            <div className="variation-grid">
-              {[0, 90, 180, 270].map((deg) => (
+            <div className="direction-cross">
+              <div className="direction-cross-row">
+                <div className="direction-cross-spacer" />
                 <div
-                  key={deg}
                   className="variation-option"
-                  onClick={() => dispatch({ type: "CHOOSE_DIRECTION", direction: deg / 90 })}
+                  onClick={() => dispatch({ type: "CHOOSE_DIRECTION", direction: 0 })}
                 >
-                  <div style={{ transform: `rotate(${deg}deg)` }}>
+                  <div style={{ transform: `rotate(0deg)` }}>
                     <Ficha
                       {...selectedHandPiece.piece}
-                      variation={selectedHandPiece.piece.variations[0]}
+                      variation={selectedHandPiece.piece.variations[state.selectedVariationIndex!]}
                       user={currentPlayer.user}
                     />
                   </div>
-                  <span>{deg}°</span>
                 </div>
-              ))}
+                <div className="direction-cross-spacer" />
+              </div>
+              <div className="direction-cross-row">
+                <div
+                  className="variation-option"
+                  onClick={() => dispatch({ type: "CHOOSE_DIRECTION", direction: 3 })}
+                >
+                  <div style={{ transform: `rotate(270deg)` }}>
+                    <Ficha
+                      {...selectedHandPiece.piece}
+                      variation={selectedHandPiece.piece.variations[state.selectedVariationIndex!]}
+                      user={currentPlayer.user}
+                    />
+                  </div>
+                </div>
+                <div className="direction-cross-center">
+                  <Ficha
+                    {...selectedHandPiece.piece}
+                    variation={selectedHandPiece.piece.variations[state.selectedVariationIndex!]}
+                    user={currentPlayer.user}
+                  />
+                </div>
+                <div
+                  className="variation-option"
+                  onClick={() => dispatch({ type: "CHOOSE_DIRECTION", direction: 1 })}
+                >
+                  <div style={{ transform: `rotate(90deg)` }}>
+                    <Ficha
+                      {...selectedHandPiece.piece}
+                      variation={selectedHandPiece.piece.variations[state.selectedVariationIndex!]}
+                      user={currentPlayer.user}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="direction-cross-row">
+                <div className="direction-cross-spacer" />
+                <div
+                  className="variation-option"
+                  onClick={() => dispatch({ type: "CHOOSE_DIRECTION", direction: 2 })}
+                >
+                  <div style={{ transform: `rotate(180deg)` }}>
+                    <Ficha
+                      {...selectedHandPiece.piece}
+                      variation={selectedHandPiece.piece.variations[state.selectedVariationIndex!]}
+                      user={currentPlayer.user}
+                    />
+                  </div>
+                </div>
+                <div className="direction-cross-spacer" />
+              </div>
             </div>
           </div>
         )}
 
         {/* Line chooser overlay */}
-        {state.phase === "choosingLine" && (
+        {state.phase === "choosingLine" && isMyTurn && (
           <div className="line-chooser">
             <h3>Selecciona qué 3 en línea activar:</h3>
             <div className="line-options">
@@ -240,7 +273,7 @@ export function GameBoard() {
                   const hl = isHighlighted(r, c)
                   const target = isAvailableTarget(r, c)
                   const inLine = isInAvailableLine(r, c)
-                  const isEmpty = canPlace && !cell
+                  const isEmpty = canPlace && !cell && isMyTurn
 
                   return (
                     <div
@@ -249,11 +282,13 @@ export function GameBoard() {
                       onClick={() => handleCellClick(r, c)}
                     >
                       {cell && !cell.isWall && (
-                        <Ficha
-                          {...cell.piece}
-                          variation={cell.piece.variations[cell.variationIndex]}
-                          user={cell.user}
-                        />
+                        <div style={{ transform: `rotate(${cell.direction * 90}deg)` }}>
+                          <Ficha
+                            {...cell.piece}
+                            variation={cell.piece.variations[cell.variationIndex]}
+                            user={cell.user}
+                          />
+                        </div>
                       )}
                       {cell?.isWall && (
                         <div className="wall-piece">🧱</div>
@@ -269,31 +304,15 @@ export function GameBoard() {
           </div>
         </div>
 
-        <div className="game-actions">
-          {(state.phase === "resolvingEffects" || state.phase === "resolvingActivations") && canResolve() && (
-            <button className="action-btn" onClick={() => dispatch({ type: "RESOLVED_EFFECT" })}>
-              Resolver efecto {hasEffectsQueue() ? `(+${state.turnEffectQueue.length} restantes)` : ""}
-            </button>
-          )}
-          {canSkip() && (
-            <button className="action-btn secondary" onClick={() => dispatch({ type: "SKIP_EFFECT" })}>
-              Saltar efecto
-            </button>
-          )}
-          {(state.phase === "endOfTurn") && (
-            <button className="action-btn primary" onClick={() => dispatch({ type: "NEXT_TURN" })}>
-              Siguiente turno
-            </button>
-          )}
-          {state.phase === "checkingLine" && (
-            <button className="action-btn primary" onClick={() => dispatch({ type: "RESOLVE_LINE" })}>
-              Resolver 3 en línea
-            </button>
-          )}
+        <div className="mobile-toggles">
+          <button className="action-btn mobile-toggle-btn" onClick={() => setShowPlayers(true)}>
+            👥 Jugadores
+          </button>
+          <button className="action-btn mobile-toggle-btn" onClick={() => setShowLog(true)}>
+            📋 Bitácora
+          </button>
         </div>
-      </div>
 
-      <div className="game-sidebar right-sidebar">
         <div className="hand-section">
           <h3>Mano de {currentPlayer.name}</h3>
           <div className="hand-grid">
@@ -303,12 +322,12 @@ export function GameBoard() {
               currentPlayer.hand.map((hp, i) => (
                 <div
                   key={i}
-                  className={`hand-piece ${i === state.selectedHandPieceIndex ? "selected" : ""} ${state.phase === "placing" ? "selectable" : ""}`}
+                  className={`hand-piece ${i === state.selectedHandPieceIndex ? "selected" : ""} ${state.phase === "placing" && isMyTurn ? "selectable" : ""}`}
                   onClick={() => handleHandClick(i)}
                 >
                   <Ficha
                     {...hp.piece}
-                    variation={hp.piece.variations[hp.piece.variations.length > 1 ? 0 : 0]}
+                    variation={hp.piece.variations[0]}
                     user={currentPlayer.user}
                   />
                   <div className="hand-piece-name">
@@ -320,6 +339,31 @@ export function GameBoard() {
           </div>
         </div>
 
+        <div className="game-actions">
+          {(state.phase === "resolvingEffects" || state.phase === "resolvingActivations") && canResolve() && isMyTurn && (
+            <button className="action-btn" onClick={() => dispatch({ type: "RESOLVED_EFFECT" })}>
+              Resolver efecto {hasEffectsQueue() ? `(+${state.turnEffectQueue.length} restantes)` : ""}
+            </button>
+          )}
+          {canSkip() && isMyTurn && (
+            <button className="action-btn secondary" onClick={() => dispatch({ type: "SKIP_EFFECT" })}>
+              Saltar efecto
+            </button>
+          )}
+          {(state.phase === "endOfTurn") && isMyTurn && (
+            <button className="action-btn primary" onClick={() => dispatch({ type: "NEXT_TURN" })}>
+              Siguiente turno
+            </button>
+          )}
+          {state.phase === "checkingLine" && isMyTurn && (
+            <button className="action-btn primary" onClick={() => dispatch({ type: "RESOLVE_LINE" })}>
+              Resolver 3 en línea
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="game-sidebar right-sidebar">
         <div className="log-section">
           <h3>Bitácora</h3>
           <div className="log-list">
@@ -329,6 +373,48 @@ export function GameBoard() {
           </div>
         </div>
       </div>
+
+      {/* Players modal (mobile) */}
+      {showPlayers && (
+        <div className="mobile-modal-overlay" onClick={() => setShowPlayers(false)}>
+          <div className="mobile-modal-content" onClick={e => e.stopPropagation()}>
+            <h2>Jugadores</h2>
+            <div className="mobile-modal-players">
+              {state.players.map((p, i) => (
+                <div key={i} className={`player-score ${i === state.currentPlayerIndex ? "active" : ""}`}>
+                  <div className="mini-piece">
+                    <Ficha {...SIN_EFECTO_FICHA} variation={EMPTY_VARIATION} user={p.user} />
+                  </div>
+                  <div className="player-score-info">
+                    <div className="player-score-name">{p.name}</div>
+                    <div className="player-score-value">
+                      {p.score} / {state.scoreToWin}
+                      {i === state.currentPlayerIndex && state.phase !== "gameOver" &&
+                        state.phase !== "setup" && <span className="turn-indicator">◀ TURNO</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button className="action-btn mobile-modal-close" onClick={() => setShowPlayers(false)}>Cerrar</button>
+          </div>
+        </div>
+      )}
+
+      {/* Log modal (mobile) */}
+      {showLog && (
+        <div className="mobile-modal-overlay" onClick={() => setShowLog(false)}>
+          <div className="mobile-modal-content" onClick={e => e.stopPropagation()}>
+            <h2>Bitácora</h2>
+            <div className="mobile-modal-log">
+              {state.logs.slice(-50).map((log, i) => (
+                <div key={i} className="log-entry">{log}</div>
+              ))}
+            </div>
+            <button className="action-btn mobile-modal-close" onClick={() => setShowLog(false)}>Cerrar</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { IUsers } from "../interface/users"
 import { useGame } from "./GameContext"
 import { Ficha } from "../components/Ficha"
@@ -17,35 +17,76 @@ const COLOR_NAMES: Record<IUsers, string> = {
 
 const ALL_USERS = Object.values(IUsers)
 
+function loadSavedPlayers(count: number): { name: string; user: IUsers }[] {
+  try {
+    const saved = localStorage.getItem("gameSetupPlayers")
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      if (Array.isArray(parsed) && parsed.length === count) {
+        return parsed.map((p: { name: string; user: IUsers }) => ({
+          name: p.name || `Jugador ${parsed.indexOf(p) + 1}`,
+          user: ALL_USERS.includes(p.user) ? p.user : ALL_USERS[parsed.indexOf(p)],
+        }))
+      }
+    }
+  } catch {}
+  return ALL_USERS.slice(0, count).map((user, i) => ({
+    name: `Jugador ${i + 1}`,
+    user,
+  }))
+}
+
 export function GameSetup() {
   const { dispatch } = useGame()
   const [playerCount, setPlayerCount] = useState(2)
-  const [players, setPlayers] = useState(
-    ALL_USERS.slice(0, 2).map((user, i) => ({
-      name: `Jugador ${i + 1}`,
-      user,
-    }))
-  )
+  const [players, setPlayers] = useState(() => loadSavedPlayers(2))
+
+  useEffect(() => {
+    localStorage.setItem("gameSetupPlayers", JSON.stringify(players))
+  }, [players])
 
   function handlePlayerCountChange(count: number) {
     setPlayerCount(count)
-    setPlayers(
-      ALL_USERS.slice(0, count).map((user, i) => ({
-        name: players[i]?.name || `Jugador ${i + 1}`,
-        user,
-      }))
-    )
+    setPlayers(prev => {
+      const saved = loadSavedPlayers(count)
+      if (prev.length >= count) return prev.slice(0, count)
+      return saved.map((p, i) => prev[i] || p)
+    })
   }
 
   function handleNameChange(index: number, name: string) {
     setPlayers(prev => prev.map((p, i) => i === index ? { ...p, name } : p))
   }
 
+  function handleUserChange(index: number, newUser: IUsers) {
+    setPlayers(prev => prev.map((p, i) => i === index ? { ...p, user: newUser } : p))
+  }
+
+  function getAvailableUsers(currentIndex: number): IUsers[] {
+    const taken = players
+      .filter((_, i) => i !== currentIndex)
+      .map(p => p.user)
+    return ALL_USERS.filter(u => !taken.includes(u))
+  }
+
   function handleStart() {
-    const configs = players.slice(0, playerCount).map((p, i) => ({
+    const rawConfigs = players.slice(0, playerCount).map((p, i) => ({
       name: p.name || `Jugador ${i + 1}`,
       user: p.user,
     }))
+    const nameCount = new Map<string, number>()
+    for (const p of rawConfigs) {
+      nameCount.set(p.name, (nameCount.get(p.name) ?? 0) + 1)
+    }
+    const seen = new Map<string, number>()
+    const configs = rawConfigs.map(p => {
+      if ((nameCount.get(p.name) ?? 0) > 1) {
+        const count = (seen.get(p.name) ?? 0) + 1
+        seen.set(p.name, count)
+        return { ...p, name: `${p.name} ${count}` }
+      }
+      return p
+    })
     dispatch({ type: "START_GAME", playerConfigs: configs })
   }
 
@@ -81,7 +122,7 @@ export function GameSetup() {
           <h3>Jugadores</h3>
           {players.slice(0, playerCount).map((p, i) => (
             <div key={i} className="setup-player-row">
-              <div className="setup-player-color" style={{ background: p.user === IUsers.Espias ? "#555" : undefined }}>
+              <div className="setup-player-color">
                 <Ficha {...FICHAS_SIN_EFECTO[0]} variation={FICHAS_SIN_EFECTO[0].variations[0]} user={p.user} />
               </div>
               <div className="setup-player-info">
@@ -93,6 +134,20 @@ export function GameSetup() {
                   placeholder={`Jugador ${i + 1}`}
                   className="setup-name-input"
                 />
+                <select
+                  value={p.user}
+                  onChange={e => handleUserChange(i, e.target.value as IUsers)}
+                  className="setup-user-select"
+                >
+                  {ALL_USERS.map(u => {
+                    const taken = u !== p.user && players.some((op, oi) => oi !== i && op.user === u)
+                    return (
+                      <option key={u} value={u} disabled={taken}>
+                        {COLOR_NAMES[u]} {taken ? "(ocupado)" : ""}
+                      </option>
+                    )
+                  })}
+                </select>
               </div>
             </div>
           ))}

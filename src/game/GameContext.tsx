@@ -9,8 +9,18 @@ interface GameContextValue {
 
 const GameContext = createContext<GameContextValue | null>(null)
 
-export function GameProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(gameReducer, null, createInitialState)
+export function GameProvider({
+  children,
+  externalState,
+  externalDispatch,
+}: {
+  children: ReactNode
+  externalState?: GameState
+  externalDispatch?: React.Dispatch<GameAction>
+}) {
+  const [localState, localDispatch] = useReducer(gameReducer, null, createInitialState)
+  const state = externalState ?? localState
+  const dispatch = externalDispatch ?? localDispatch
   return (
     <GameContext.Provider value={{ state, dispatch }}>
       {children}

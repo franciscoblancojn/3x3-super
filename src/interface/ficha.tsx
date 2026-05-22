@@ -8,6 +8,7 @@ export interface IFicha {
     power: IPowers,
     action: IAction
     quantity?:number,
+    haveRotate:boolean,
     variations: [
         [IFichaAction, IFichaAction, IFichaAction],
         [IFichaAction, 0, IFichaAction],

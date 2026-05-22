@@ -104,3 +104,4 @@ export type GameAction =
   | { type: "RESOLVE_LINE" }
   | { type: "SELECT_LINE"; lineIndex: number }
   | { type: "SKIP_EFFECT" }
+  | { type: "REMOVE_PLAYER"; playerIndex: number }

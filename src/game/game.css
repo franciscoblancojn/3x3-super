@@ -132,6 +132,23 @@
   border-color: var(--accent);
 }
 
+.setup-user-select {
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-h);
+  font-size: 0.85rem;
+  width: 100%;
+  margin-top: 0.3rem;
+  cursor: pointer;
+}
+
+.setup-user-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .start-btn {
   padding: 0.75rem 1.5rem;
   font-size: 1.1rem;
@@ -160,11 +177,66 @@
 @media (max-width: 1100px) {
   .game-layout {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr auto;
+    grid-template-rows: 1fr auto;
+    height: 100dvh;
+    overflow: hidden;
   }
-  .left-sidebar { order: 1; }
-  .game-main { order: 2; }
-  .right-sidebar { order: 3; }
+  .left-sidebar { display: none; }
+  .right-sidebar { display: none; }
+  .game-main {
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem;
+    gap: 0.4rem;
+    overflow: hidden;
+    min-height: 0;
+    height: 100dvh;
+  }
+  .board-container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .board-cell {
+    width: min(11vw, 65px);
+    height: min(11vw, 65px);
+  }
+  .board-cell .ficha {
+    --size: min(11vw, 65px);
+  }
+  .board-grid {
+    gap: 2px;
+    padding: 5px;
+  }
+  .hand-section {
+    flex-shrink: 0;
+  }
+  .hand-grid {
+    gap: 0.3rem;
+  }
+  .hand-piece .ficha {
+    --size: 2.8rem;
+  }
+  .hand-piece-name {
+    max-width: 2.8rem;
+    font-size: 0.55rem;
+  }
+  .game-header {
+    flex-shrink: 0;
+  }
+  .game-actions {
+    flex-shrink: 0;
+    padding: 0.25rem 0;
+    min-height: 2.5rem;
+  }
+  .phase-message {
+    font-size: 0.85rem;
+  }
+  .turn-info {
+    font-size: 0.75rem;
+  }
 }
 
 /* Sidebars */
@@ -425,6 +497,35 @@
   color: var(--text);
 }
 
+.direction-cross {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.direction-cross-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.direction-cross-spacer {
+  width: 5rem;
+}
+
+.direction-cross-center {
+  width: 5rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.direction-cross-center .ficha {
+  --size: 3rem;
+  opacity: 0.4;
+}
+
 /* Line chooser */
 .line-chooser {
   position: absolute;
@@ -663,5 +764,76 @@
 }
 
 .game-over-buttons .action-btn {
+  width: 100%;
+}
+
+/* Mobile toggle buttons */
+.mobile-toggles {
+  display: none;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+@media (max-width: 1100px) {
+  .mobile-toggles {
+    display: flex;
+  }
+}
+
+.mobile-toggle-btn {
+  font-size: 0.85rem !important;
+  padding: 0.4rem 1rem !important;
+  flex: 1;
+  max-width: 160px;
+}
+
+/* Mobile modals */
+.mobile-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.mobile-modal-content {
+  background: var(--bg);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  max-width: 400px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  animation: popIn 0.2s ease-out;
+}
+
+.mobile-modal-content h2 {
+  margin: 0 0 1rem;
+  color: var(--text-h);
+  text-align: center;
+}
+
+.mobile-modal-players {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.mobile-modal-log {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 1rem;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.mobile-modal-close {
   width: 100%;
 }

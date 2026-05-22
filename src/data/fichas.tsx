@@ -14,6 +14,7 @@ export const FICHAS_MANO : IFicha[] = [
             ]
         ],
         decription:"Anula un efecto. La ficha seleccionada se comporta como Ficha sin efecto.",
+        haveRotate:false
     },
 ]
 export const FICHAS_ACTIVACION : IFicha[] = [
@@ -33,6 +34,7 @@ export const FICHAS_ACTIVACION : IFicha[] = [
             ],
         ],
         decription:"Se duplica en una dirección. Sobrevive al 3 en linea.",
+        haveRotate:true
     },
     {
         power:IPowers.Protector,
@@ -50,6 +52,7 @@ export const FICHAS_ACTIVACION : IFicha[] = [
             ],
         ],
         decription:"Protege una ficha de ser destruida por 3 en línea.",
+        haveRotate:true
     },
 ]
 export const FICHAS_DESTRUCCION : IFicha[] = [
@@ -74,6 +77,7 @@ export const FICHAS_DESTRUCCION : IFicha[] = [
             ],
         ],
         decription:"Destruye las fichas señaladas.",
+        haveRotate:true
     },
     {
         power:IPowers.Trampa_Lineal,
@@ -91,6 +95,7 @@ export const FICHAS_DESTRUCCION : IFicha[] = [
             ],
         ],
         decription:"Arrasa toda la línea señalada.",
+        haveRotate:true
     },
     {
         power:IPowers.Muro,
@@ -107,6 +112,7 @@ export const FICHAS_DESTRUCCION : IFicha[] = [
             <br/>
             Muro: Inamovible e inmune a destrucción.  Bloquea efectos en línea. Solo puede existir un muro, al crearce otro, el actual es removido del tablero. La ficha puede ser usada para 3 en linea, el muro no.
         </>,
+        haveRotate:false
     },
 ]
 export const FICHAS_INSTANTANEA : IFicha[] = [
@@ -131,6 +137,7 @@ export const FICHAS_INSTANTANEA : IFicha[] = [
             ],
         ],
         decription:"Destruye las fichas señaladas.",
+        haveRotate:true
     },
     {
         power:IPowers.Eliminacion_Linea,
@@ -148,6 +155,7 @@ export const FICHAS_INSTANTANEA : IFicha[] = [
             ],
         ],
         decription:"Destruye toda la línea señalada.",
+        haveRotate:true
     },
     {
         power:IPowers.Francotirador,
@@ -160,6 +168,7 @@ export const FICHAS_INSTANTANEA : IFicha[] = [
             ],
         ],
         decription:"Elimina una ficha a elección.",
+        haveRotate:false
     },
     {
         power:IPowers.Peso,
@@ -172,6 +181,7 @@ export const FICHAS_INSTANTANEA : IFicha[] = [
             ],
         ],
         decription:"Empuja todas las fichas en la dirección indicada hasta el límite.",
+        haveRotate:true
     },
 ]
 export const FICHAS_TURNO : IFicha[] = [
@@ -186,6 +196,7 @@ export const FICHAS_TURNO : IFicha[] = [
             ]
         ],
         decription:"Si apunta a vacío, coloca una ficha sin efecto de la mano. Si apunta a ficha, la destruye. Luego gira.",
+        haveRotate:true
     },
     {
         power:IPowers.Germen,
@@ -198,6 +209,7 @@ export const FICHAS_TURNO : IFicha[] = [
             ]
         ],
         decription:"Infecta: destruye una ficha y la reemplaza por una sin efecto de la mano.",
+        haveRotate:true
     },
     {
         power:IPowers.Corredor,
@@ -215,6 +227,7 @@ export const FICHAS_TURNO : IFicha[] = [
             ],
         ],
         decription:"Avanza en su dirección. Destruye al impactar. Inmune al moverse. No atraviesa muros.",
+        haveRotate:true
     },
     {
         power:IPowers.Incendio,
@@ -232,6 +245,7 @@ export const FICHAS_TURNO : IFicha[] = [
             ],
         ],
         decription:"Quema una ficha. Si no hay objetivo, se destrulle.",
+        haveRotate:false
     },
 ]
 
@@ -248,6 +262,7 @@ export const FICHAS_SIN_EFECTO : IFicha[] = [
             ]
         ],
         decription:"Ficha básica. Sin poder.",
+        haveRotate:false
     },
 ]
 export const FICHAS : IFicha[] = [
