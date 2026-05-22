@@ -155,7 +155,6 @@ function getArrowDirections(baseVariation: number[][], direction: number, power:
   const skipDiagonal = [
     IPowers.Eliminacion_Linea,
     IPowers.Trampa_Lineal,
-    IPowers.Corredor,
     IPowers.Destructor,
     IPowers.Germen,
   ]
@@ -569,59 +568,52 @@ function buildEffectFromSource(state: GameState, source: TurnEffectSource): Pend
   }
 
   if (power === IPowers.Corredor) {
+    // Collect valid 1-cell destinations in each arrow direction
+    const validDests: Position[] = []
     for (const d of dirs) {
-      const emptyCells: Position[] = []
-      let nr = row + d.dr, nc = col + d.dc
-      while (nr >= 0 && nr < 7 && nc >= 0 && nc < 7) {
-        const target = board[nr][nc]
-        if (target) {
-          if (!target.isWall) {
-            if (emptyCells.length === 0) {
-              return {
-                id: `corredor-destroy-${row}-${col}`,
-                description: `Corredor impactó y destruyó ficha en [${nr + 1}, ${nc + 1}]`,
-                sourcePos: { row, col },
-                sourceUser: player.user,
-                targets: [{ row: nr, col: nc }],
-                needsTargetSelection: false,
-                availableTargets: [],
-                effectPower: IPowers.Corredor,
-              }
-            } else if (emptyCells.length === 1) {
-              return {
-                id: `corredor-move1-${row}-${col}`,
-                description: `Corredor avanzó y destruyó ficha en [${nr + 1}, ${nc + 1}]`,
-                sourcePos: { row, col },
-                sourceUser: player.user,
-                targets: [{ row: nr, col: nc }],
-                piecesToMove: [{
-                  from: { row, col },
-                  to: emptyCells[0],
-                }],
-                needsTargetSelection: false,
-                availableTargets: [],
-                effectPower: IPowers.Corredor,
-              }
-            } else {
-              return {
-                id: `corredor-move-${row}-${col}`,
-                description: `Corredor → selecciona dónde moverse`,
-                sourcePos: { row, col },
-                sourceUser: player.user,
-                targets: [{ row: nr, col: nc }],
-                needsTargetSelection: true,
-                availableTargets: emptyCells,
-                effectPower: IPowers.Corredor,
-              }
-            }
-          }
-          break
-        }
-        emptyCells.push({ row: nr, col: nc })
-        nr += d.dr; nc += d.dc
+      const nr = row + d.dr, nc = col + d.dc
+      if (nr < 0 || nr >= 7 || nc < 0 || nc >= 7) continue
+      const cell = board[nr][nc]
+      if (cell?.isWall) continue  // walls block movement
+      validDests.push({ row: nr, col: nc })
+    }
+    if (validDests.length === 0) return null
+
+    const destLabel = (p: Position) => {
+      const destCell = board[p.row][p.col]
+      return destCell && !destCell.isWall
+        ? `[${p.row + 1}, ${p.col + 1}] (destruye)`
+        : `[${p.row + 1}, ${p.col + 1}]`
+    }
+
+    if (validDests.length === 1) {
+      const dest = validDests[0]
+      const destCell = board[dest.row][dest.col]
+      const hasPiece = !!destCell && !destCell.isWall
+      return {
+        id: `corredor-move-${row}-${col}`,
+        description: `Corredor avanza a ${destLabel(dest)}`,
+        sourcePos: { row, col },
+        sourceUser: player.user,
+        targets: hasPiece ? [dest] : [],
+        piecesToMove: [{ from: { row, col }, to: dest }],
+        needsTargetSelection: false,
+        availableTargets: [],
+        effectPower: IPowers.Corredor,
       }
     }
-    return null
+
+    // Multiple valid destinations: player chooses
+    return {
+      id: `corredor-choose-${row}-${col}`,
+      description: `Corredor → selecciona a donde moverse`,
+      sourcePos: { row, col },
+      sourceUser: player.user,
+      targets: [],
+      needsTargetSelection: true,
+      availableTargets: validDests,
+      effectPower: IPowers.Corredor,
+    }
   }
 
   if (power === IPowers.Incendio) {
@@ -1574,24 +1566,26 @@ function resolveCorredorTarget(state: GameState, row: number, col: number): Game
   if (!target) return state
   const newBoard = state.board.map(r => r.map(c => c ? { ...c } : null))
 
+  // Destroy any piece already at the destination
+  const cleared: ClearedCell[] = []
+  const destCell = newBoard[target.row][target.col]
+  if (destCell && !destCell.isWall) {
+    cleared.push({ pos: target, cell: destCell })
+    newBoard[target.row][target.col] = null
+  }
+
+  // Move Corredor to destination
   const srcCell = newBoard[current.sourcePos.row][current.sourcePos.col]
   if (srcCell) {
     newBoard[target.row][target.col] = srcCell
     newBoard[current.sourcePos.row][current.sourcePos.col] = null
   }
 
-  const cleared: ClearedCell[] = []
-  const destroyTarget = current.targets[0]
-  if (destroyTarget) {
-    const c = newBoard[destroyTarget.row][destroyTarget.col]
-    if (c && !c.isWall) {
-      cleared.push({ pos: destroyTarget, cell: c })
-      newBoard[destroyTarget.row][destroyTarget.col] = null
-    }
-  }
   const chainEffects = buildDestructionEffects(cleared, newBoard)
-
-  const logs = [...state.logs, `Corredor avanzó a [${target.row + 1}, ${target.col + 1}] y destruyó ficha`]
+  const moveLog = cleared.length > 0
+    ? `Corredor avanzó a [${target.row + 1}, ${target.col + 1}] y destruyó ficha`
+    : `Corredor avanzó a [${target.row + 1}, ${target.col + 1}]`
+  const logs = [...state.logs, moveLog]
 
   const combinedRest = [...chainEffects, ...rest]
   if (combinedRest.length > 0) {
@@ -1605,10 +1599,7 @@ function resolveCorredorTarget(state: GameState, row: number, col: number): Game
       selectedHandPieceIndex: null, selectedVariationIndex: null,
     }
   }
-  return {
-    ...state, board: newBoard, pendingEffects: [], logs,
-    phase: "endOfTurn" as GameState["phase"],
-  }
+  return { ...state, board: newBoard, pendingEffects: [], logs, phase: "endOfTurn" as GameState["phase"] }
 }
 
 function resolveGermenTarget(state: GameState, row: number, col: number): GameState {

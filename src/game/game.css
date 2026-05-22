@@ -557,6 +557,112 @@
   font-size: 2rem;
 }
 
+/* Effect resolution modal (no target selection) */
+.effect-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg);
+  border: 2px solid var(--accent);
+  border-radius: 1rem;
+  padding: 1.25rem 1.5rem;
+  z-index: 100;
+  box-shadow: 0 0 32px rgba(0,0,0,0.45);
+  text-align: center;
+  min-width: 220px;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.effect-modal-piece-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.effect-modal-piece-row .ficha {
+  --size: 3.5rem;
+  flex-shrink: 0;
+}
+
+.effect-modal-info {
+  flex: 1;
+  text-align: left;
+}
+
+.effect-modal-name {
+  font-weight: 700;
+  color: var(--text-h);
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+}
+
+.effect-modal-desc {
+  color: var(--text);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.effect-modal-queue {
+  margin-top: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--text);
+  opacity: 0.7;
+}
+
+.effect-modal-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+}
+
+/* Effect target-selection banner */
+.effect-target-banner {
+  position: absolute;
+  top: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg);
+  border: 2px solid var(--accent);
+  border-radius: 0.75rem;
+  padding: 0.6rem 1rem;
+  z-index: 100;
+  box-shadow: 0 2px 14px rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 92%;
+}
+
+.effect-banner-piece {
+  flex-shrink: 0;
+}
+
+.effect-banner-piece .ficha {
+  --size: 2.5rem;
+}
+
+.effect-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.effect-banner-desc {
+  color: var(--text-h);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.effect-banner-hint {
+  color: var(--text);
+  font-size: 0.76rem;
+  opacity: 0.85;
+}
+
 /* Game actions */
 .game-actions {
   display: flex;

@@ -120,25 +120,13 @@ export function GameBoard({ playerIndex: myPlayerIndex }: { playerIndex?: number
     }
   }
 
-  function canResolve(): boolean {
-    if ((state.phase === "resolvingEffects" || state.phase === "resolvingActivations") && state.pendingEffects.length > 0) {
-      return !state.pendingEffects[0].needsTargetSelection
-    }
-    return false
-  }
-
-  function canSkip(): boolean {
-    if (state.phase === "resolvingEffects" && state.pendingEffects.length > 0) {
-      return state.pendingEffects[0].optional === true
-    }
-    return false
-  }
-
-  function hasEffectsQueue(): boolean {
-    return state.turnEffectQueue.length > 0
-  }
-
   const selectedHandPiece = state.selectedHandPieceIndex !== null ? currentPlayer.hand[state.selectedHandPieceIndex] : null
+
+  const isResolvingEffect = (state.phase === "resolvingEffects" || state.phase === "resolvingActivations") && state.pendingEffects.length > 0
+  const pendingEffect = isResolvingEffect ? state.pendingEffects[0] : null
+  const effectSourceCell = pendingEffect && pendingEffect.sourcePos.row >= 0
+    ? state.board[pendingEffect.sourcePos.row]?.[pendingEffect.sourcePos.col] ?? null
+    : null
 
   const [showPlayers, setShowPlayers] = useState(false)
   const [showLog, setShowLog] = useState(false)
@@ -265,6 +253,64 @@ export function GameBoard({ playerIndex: myPlayerIndex }: { playerIndex?: number
           </div>
         )}
 
+        {/* Effect resolution: full modal (no target selection) */}
+        {isResolvingEffect && pendingEffect && !pendingEffect.needsTargetSelection && isMyTurn && (
+          <div className="effect-modal">
+            <div className="effect-modal-piece-row">
+              {effectSourceCell && !effectSourceCell.isWall && (
+                <div style={{ transform: `rotate(${effectSourceCell.direction * 90}deg)` }}>
+                  <Ficha
+                    {...effectSourceCell.piece}
+                    variation={effectSourceCell.piece.variations[effectSourceCell.variationIndex]}
+                    user={effectSourceCell.user}
+                  />
+                </div>
+              )}
+              <div className="effect-modal-info">
+                {effectSourceCell && <div className="effect-modal-name">{effectSourceCell.piece.power.replaceAll("_", " ")}</div>}
+                <div className="effect-modal-desc">{pendingEffect.description}</div>
+                {state.turnEffectQueue.length > 0 && (
+                  <div className="effect-modal-queue">+{state.turnEffectQueue.length} efecto(s) pendiente(s)</div>
+                )}
+              </div>
+            </div>
+            <div className="effect-modal-actions">
+              <button className="action-btn primary" onClick={() => dispatch({ type: "RESOLVED_EFFECT" })}>
+                Resolver
+              </button>
+              {pendingEffect.optional && (
+                <button className="action-btn secondary" onClick={() => dispatch({ type: "SKIP_EFFECT" })}>
+                  Saltar
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Effect resolution: target-selection banner (player must click board) */}
+        {isResolvingEffect && pendingEffect && pendingEffect.needsTargetSelection && isMyTurn && (
+          <div className="effect-target-banner">
+            {effectSourceCell && !effectSourceCell.isWall && (
+              <div className="effect-banner-piece" style={{ transform: `rotate(${effectSourceCell.direction * 90}deg)` }}>
+                <Ficha
+                  {...effectSourceCell.piece}
+                  variation={effectSourceCell.piece.variations[effectSourceCell.variationIndex]}
+                  user={effectSourceCell.user}
+                />
+              </div>
+            )}
+            <div className="effect-banner-text">
+              <span className="effect-banner-desc">{pendingEffect.description}</span>
+              <span className="effect-banner-hint">Selecciona una celda resaltada</span>
+            </div>
+            {pendingEffect.optional && (
+              <button className="action-btn secondary small" onClick={() => dispatch({ type: "SKIP_EFFECT" })}>
+                Saltar
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="board-container">
           <div className="board-grid">
             {Array.from({ length: BOARD_SIZE }, (_, r) => (
@@ -341,16 +387,6 @@ export function GameBoard({ playerIndex: myPlayerIndex }: { playerIndex?: number
         </div>
 
         <div className="game-actions">
-          {(state.phase === "resolvingEffects" || state.phase === "resolvingActivations") && canResolve() && isMyTurn && (
-            <button className="action-btn" onClick={() => dispatch({ type: "RESOLVED_EFFECT" })}>
-              Resolver efecto {hasEffectsQueue() ? `(+${state.turnEffectQueue.length} restantes)` : ""}
-            </button>
-          )}
-          {canSkip() && isMyTurn && (
-            <button className="action-btn secondary" onClick={() => dispatch({ type: "SKIP_EFFECT" })}>
-              Saltar efecto
-            </button>
-          )}
           {(state.phase === "endOfTurn") && isMyTurn && (
             <button className="action-btn primary" onClick={() => dispatch({ type: "NEXT_TURN" })}>
               Siguiente turno
