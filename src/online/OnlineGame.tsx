@@ -44,14 +44,18 @@ function HostSync({ configs }: { configs: { name: string; user: import("../inter
   return null
 }
 
-function ClientReceiver({ children }: { children: React.ReactNode }) {
+function ClientReceiver({ playerIndex, children }: { playerIndex: number; children: React.ReactNode }) {
   const { send, lastGameState } = useOnline()
+  const lastGameStateRef = useRef(lastGameState)
+  useEffect(() => { lastGameStateRef.current = lastGameState }, [lastGameState])
 
   const dispatch = useCallback(
     (action: GameAction) => {
+      const currentState = lastGameStateRef.current
+      if (currentState && currentState.currentPlayerIndex !== playerIndex) return
       send({ type: "game_action", action })
     },
-    [send],
+    [send, playerIndex],
   )
 
   if (!lastGameState) {
@@ -73,7 +77,7 @@ function ClientReceiver({ children }: { children: React.ReactNode }) {
   )
 }
 
-function OnlineGameInner({ children }: { children: React.ReactNode }) {
+function OnlineGameInner({ playerIndex, children }: { playerIndex: number; children: React.ReactNode }) {
   const { state } = useGame()
   if (state.phase === "setup") {
     return (
@@ -85,7 +89,21 @@ function OnlineGameInner({ children }: { children: React.ReactNode }) {
       </div>
     )
   }
-  return <><BackButton />{children}</>
+
+  const isMyTurn = playerIndex === state.currentPlayerIndex
+  const currentPlayerName = state.players[state.currentPlayerIndex]?.name
+
+  return (
+    <>
+      <BackButton />
+      {!isMyTurn && state.phase !== "gameOver" && (
+        <div className="spectator-banner">
+          Turno de <strong>{currentPlayerName}</strong> — Solo puedes observar
+        </div>
+      )}
+      {children}
+    </>
+  )
 }
 
 function BackButton() {
@@ -104,7 +122,7 @@ export function OnlineHostGame({ configs, playerIndex }: { configs: { name: stri
   return (
     <GameProvider>
       <HostSync configs={configs} />
-      <OnlineGameInner>
+      <OnlineGameInner playerIndex={playerIndex}>
         <GameBoard playerIndex={playerIndex} />
         <GameOverWrapper />
       </OnlineGameInner>
@@ -120,8 +138,8 @@ function GameOverWrapper() {
 
 export function OnlineClientGame({ playerIndex }: { playerIndex: number }) {
   return (
-    <ClientReceiver>
-      <OnlineGameInner>
+    <ClientReceiver playerIndex={playerIndex}>
+      <OnlineGameInner playerIndex={playerIndex}>
         <GameBoard playerIndex={playerIndex} />
         <GameOverWrapper />
       </OnlineGameInner>

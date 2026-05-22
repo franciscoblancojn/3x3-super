@@ -69,6 +69,7 @@ export function GameBoard({ playerIndex: myPlayerIndex }: { playerIndex?: number
   }
 
   function isAvailableTarget(row: number, col: number): boolean {
+    if (!isMyTurn) return false
     if (state.phase === "waitingForTarget" || state.phase === "resolvingEffects" || state.phase === "resolvingActivations") {
       const pe = state.pendingEffects[0]
       if (pe && pe.needsTargetSelection) {

@@ -11,6 +11,24 @@ type LobbyScreen =
   | { type: "in_room"; players: { id: string; name: string; user: string }[]; roomId: string; isHost: boolean }
 
 const ALL_USERS = Object.values(IUsers)
+const LS_KEY = "game_preferred_user"
+
+function getSavedUser(): string | null {
+  try {
+    const v = localStorage.getItem(LS_KEY)
+    return v && ALL_USERS.includes(v as IUsers) ? v : null
+  } catch {
+    return null
+  }
+}
+
+function saveUser(user: string) {
+  try {
+    localStorage.setItem(LS_KEY, user)
+  } catch {
+    // ignore
+  }
+}
 
 function normalizePlayers(players: { id: string; name: string; user?: string }[]): { id: string; name: string; user: string }[] {
   return players.map((p, i) => ({
@@ -66,7 +84,16 @@ export function OnlineLobby({
         case "player_joined": {
           setScreen((prev) => {
             if (prev.type !== "in_room") return prev
-            return { ...prev, players: normalizePlayers(msg.players as { id: string; name: string; user?: string }[]) }
+            // Merge incoming players, preserving current selections
+            const incoming = (msg.players as { id: string; name: string; user?: string }[])
+            const merged = incoming.map((p, i) => {
+              const existing = prev.players.find(ep => ep.id === p.id)
+              return {
+                ...p,
+                user: existing?.user ?? ((p.user && ALL_USERS.includes(p.user as IUsers)) ? p.user : ALL_USERS[i % ALL_USERS.length]),
+              }
+            })
+            return { ...prev, players: merged }
           })
           break
         }
@@ -108,11 +135,13 @@ export function OnlineLobby({
   }, [subscribe])
 
   function handleCreateRoom() {
-    send({ type: "create_room", playerName })
+    const preferredUser = getSavedUser()
+    send({ type: "create_room", playerName, ...(preferredUser ? { preferredUser } : {}) })
   }
 
   function handleJoinRoom(roomId: string) {
-    send({ type: "join_room", roomId, playerName })
+    const preferredUser = getSavedUser()
+    send({ type: "join_room", roomId, playerName, ...(preferredUser ? { preferredUser } : {}) })
   }
 
   function handleLeaveRoom() {
@@ -121,6 +150,9 @@ export function OnlineLobby({
   }
 
   function handleUserChange(playerId: string, newUser: string) {
+    if (playerId === clientId) {
+      saveUser(newUser)
+    }
     setScreen((prev) => {
       if (prev.type !== "in_room") return prev
       return { ...prev, players: prev.players.map(p => p.id === playerId ? { ...p, user: newUser } : p) }
@@ -160,25 +192,30 @@ export function OnlineLobby({
           <div className="room-players-section">
             <h3>Jugadores conectados ({screen.players.length})</h3>
             <div className="room-players-list">
-              {screen.players.map((p, i) => (
-                <div key={p.id} className="room-player-row">
-                  <Ficha {...FICHAS_SIN_EFECTO[0]} variation={FICHAS_SIN_EFECTO[0].variations[0]} user={p.user as IUsers} />
-                  <span>{p.name}</span>
-                  {(screen.isHost || clientId === p.id) && (
-                    <select value={p.user} onChange={e => handleUserChange(p.id, e.target.value)} className="room-user-select">
-                      {Object.values(IUsers).map(u => {
-                        const taken = u !== p.user && screen.players.some(op => op.id !== p.id && op.user === u)
-                        return (
-                          <option key={u} value={u} disabled={taken}>
-                            {u} {taken ? "(ocupado)" : ""}
-                          </option>
-                        )
-                      })}
-                    </select>
-                  )}
-                  {i === 0 && <span className="host-tag">Anfitrión</span>}
-                </div>
-              ))}
+              {screen.players.map((p, i) => {
+                const canEdit = screen.isHost || clientId === p.id
+                return (
+                  <div key={p.id} className="room-player-row">
+                    <Ficha {...FICHAS_SIN_EFECTO[0]} variation={FICHAS_SIN_EFECTO[0].variations[0]} user={p.user as IUsers} />
+                    <span>{p.name}</span>
+                    {canEdit ? (
+                      <select value={p.user} onChange={e => handleUserChange(p.id, e.target.value)} className="room-user-select">
+                        {Object.values(IUsers).map(u => {
+                          const taken = u !== p.user && screen.players.some(op => op.id !== p.id && op.user === u)
+                          return (
+                            <option key={u} value={u} disabled={taken}>
+                              {u} {taken ? "(ocupado)" : ""}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    ) : (
+                      <span className="room-user-label">{p.user}</span>
+                    )}
+                    {i === 0 && <span className="host-tag">Anfitrión</span>}
+                  </div>
+                )
+              })}
             </div>
           </div>
 

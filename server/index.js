@@ -37,10 +37,11 @@ wss.on("connection", (ws) => {
         roomId = id
         playerName = msg.playerName || "Anfitrión"
 
+        const preferredUser = (msg.preferredUser && USERS.includes(msg.preferredUser)) ? msg.preferredUser : USERS[0]
         const room = {
           id,
           hostId: clientId,
-          players: [{ id: clientId, name: playerName, user: USERS[0] }],
+          players: [{ id: clientId, name: playerName, user: preferredUser }],
         }
         rooms.set(id, room)
 
@@ -66,7 +67,9 @@ wss.on("connection", (ws) => {
         roomId = msg.roomId
         playerName = msg.playerName || "Jugador"
 
-        const newUser = getAvailableUser(room.players)
+        const preferred = msg.preferredUser
+        const isFree = preferred && USERS.includes(preferred) && !room.players.some(p => p.user === preferred)
+        const newUser = isFree ? preferred : getAvailableUser(room.players)
         room.players.push({ id: clientId, name: playerName, user: newUser })
 
         ws.send(JSON.stringify({
