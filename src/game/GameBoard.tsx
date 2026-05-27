@@ -20,6 +20,7 @@ export function GameBoard({ playerIndex: myPlayerIndex }: { playerIndex?: number
   const currentPlayer = state.players[state.currentPlayerIndex]
   const canPlace = state.phase === "placing" && state.selectedHandPieceIndex !== null && state.selectedVariationIndex !== null
   const isMyTurn = myPlayerIndex === undefined || myPlayerIndex === state.currentPlayerIndex
+  const myPlayer = myPlayerIndex !== undefined ? state.players[myPlayerIndex] : currentPlayer
 
   function handleCellClick(row: number, col: number) {
     if (!isMyTurn) return
@@ -132,7 +133,7 @@ export function GameBoard({ playerIndex: myPlayerIndex }: { playerIndex?: number
   const [showLog, setShowLog] = useState(false)
 
   return (
-    <div className="game-layout">
+    <div className={`game-layout ${isMyTurn && myPlayerIndex !== undefined ? "my-turn" : ""}`}>
       <div className="game-sidebar left-sidebar">
         {state.players.map((p, i) => (
           <div
@@ -361,12 +362,12 @@ export function GameBoard({ playerIndex: myPlayerIndex }: { playerIndex?: number
         </div>
 
         <div className="hand-section">
-          <h3>Mano de {currentPlayer.name}</h3>
+          <h3>Mano de {myPlayer.name}</h3>
           <div className="hand-grid">
-            {currentPlayer.hand.length === 0 ? (
+            {myPlayer.hand.length === 0 ? (
               <div className="empty-hand">Sin fichas</div>
             ) : (
-              currentPlayer.hand.map((hp, i) => (
+              myPlayer.hand.map((hp, i) => (
                 <div
                   key={i}
                   className={`hand-piece ${i === state.selectedHandPieceIndex ? "selected" : ""} ${state.phase === "placing" && isMyTurn ? "selectable" : ""}`}
@@ -375,7 +376,7 @@ export function GameBoard({ playerIndex: myPlayerIndex }: { playerIndex?: number
                   <Ficha
                     {...hp.piece}
                     variation={hp.piece.variations[0]}
-                    user={currentPlayer.user}
+                    user={myPlayer.user}
                   />
                   <div className="hand-piece-name">
                     {hp.piece.power.replaceAll("_", " ")}

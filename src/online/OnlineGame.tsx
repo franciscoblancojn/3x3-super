@@ -1,5 +1,5 @@
-import { useEffect, useRef, useCallback } from "react"
-import { useOnline } from "./OnlineContext"
+import { useEffect, useRef, useState, useCallback } from "react"
+import { useOnline, loadReconnectInfo } from "./OnlineContext"
 import { GameProvider } from "../game/GameContext"
 import { GameBoard } from "../game/GameBoard"
 import { GameOver } from "../game/GameOver"
@@ -8,7 +8,7 @@ import type { GameAction } from "../game/types"
 
 function HostSync({ configs }: { configs: { name: string; user: import("../interface/users").IUsers }[] }) {
   const { state, dispatch } = useGame()
-  const { send, subscribe } = useOnline()
+  const { send, subscribe, sessionId, saveReconnect, roomId } = useOnline()
   const started = useRef(false)
   const stateRef = useRef(state)
   useEffect(() => { stateRef.current = state })
@@ -17,8 +17,18 @@ function HostSync({ configs }: { configs: { name: string; user: import("../inter
     if (!started.current) {
       started.current = true
       dispatch({ type: "START_GAME", playerConfigs: configs })
+      // Save reconnect info for host (OnlineLobby may unmount before game_started arrives)
+      const rid = roomId || loadReconnectInfo()?.roomId || "unknown"
+      saveReconnect({
+        roomId: rid,
+        sessionId,
+        playerName: configs[0]?.name || "",
+        isHost: true,
+        playerIndex: 0,
+        configs: configs.map(c => ({ name: c.name, user: c.user })),
+      })
     }
-  }, [dispatch, configs])
+  }, [dispatch, configs, sessionId, saveReconnect, roomId])
 
   useEffect(() => {
     return subscribe((msg) => {
@@ -27,8 +37,12 @@ function HostSync({ configs }: { configs: { name: string; user: import("../inter
           dispatch((msg.action as GameAction))
         }
       }
-      if (msg.type === "player_disconnected") {
-        dispatch({ type: "REMOVE_PLAYER", playerIndex: msg.playerIndex as number })
+      if (msg.type === "player_left") {
+        const idx = msg.playerIndex as number
+        // Only remove if player is still within bounds
+        if (idx >= 0 && idx < stateRef.current.players.length) {
+          dispatch({ type: "REMOVE_PLAYER", playerIndex: idx })
+        }
       }
     })
   }, [dispatch, subscribe])
@@ -45,7 +59,7 @@ function HostSync({ configs }: { configs: { name: string; user: import("../inter
 }
 
 function ClientReceiver({ playerIndex, children }: { playerIndex: number; children: React.ReactNode }) {
-  const { send, lastGameState } = useOnline()
+  const { send, lastGameState, clearReconnect } = useOnline()
   const lastGameStateRef = useRef(lastGameState)
   useEffect(() => { lastGameStateRef.current = lastGameState }, [lastGameState])
 
@@ -64,7 +78,7 @@ function ClientReceiver({ playerIndex, children }: { playerIndex: number; childr
         <div className="online-menu-box">
           <h2>Esperando inicio de partida...</h2>
           <p className="online-hint">El anfitrión está preparando el juego</p>
-          <button className="action-btn" onClick={() => window.location.reload()} style={{ marginTop: 16 }}>Volver al menú</button>
+          <button className="action-btn" onClick={() => { clearReconnect(); window.location.reload() }} style={{ marginTop: 16 }}>Volver al menú</button>
         </div>
       </div>
     )
@@ -79,12 +93,52 @@ function ClientReceiver({ playerIndex, children }: { playerIndex: number; childr
 
 function OnlineGameInner({ playerIndex, children }: { playerIndex: number; children: React.ReactNode }) {
   const { state } = useGame()
+  const { send, subscribe, clearReconnect } = useOnline()
+  const [disconnectedPlayers, setDisconnectedPlayers] = useState<string[]>([])
+  const [roomClosed, setRoomClosed] = useState<string | null>(null)
+
+  useEffect(() => {
+    return subscribe((msg) => {
+      if (msg.type === "player_disconnected") {
+        const name = msg.name as string
+        setDisconnectedPlayers(prev => prev.includes(name) ? prev : [...prev, name])
+      }
+      if (msg.type === "player_reconnected") {
+        const name = msg.name as string
+        setDisconnectedPlayers(prev => prev.filter(n => n !== name))
+      }
+      if (msg.type === "room_closed") {
+        setRoomClosed((msg.reason as string) || "La sala fue cerrada")
+      }
+    })
+  }, [subscribe])
+
+  function handleLeaveRoom() {
+    send({ type: "leave_room" })
+    clearReconnect()
+    window.location.reload()
+  }
+
+  if (roomClosed) {
+    return (
+      <div className="online-menu" style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100dvh" }}>
+        <div className="online-menu-box">
+          <h2>Sala cerrada</h2>
+          <p>{roomClosed}</p>
+          <button className="action-btn" onClick={() => { clearReconnect(); window.location.reload() }} style={{ marginTop: 16 }}>
+            Volver al menú
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (state.phase === "setup") {
     return (
       <div className="online-menu">
         <div className="online-menu-box">
           <h2>Preparando partida...</h2>
-          <button className="action-btn" onClick={() => window.location.reload()} style={{ marginTop: 16 }}>Volver al menú</button>
+          <button className="action-btn" onClick={() => { clearReconnect(); window.location.reload() }} style={{ marginTop: 16 }}>Volver al menú</button>
         </div>
       </div>
     )
@@ -95,7 +149,18 @@ function OnlineGameInner({ playerIndex, children }: { playerIndex: number; child
 
   return (
     <>
-      <BackButton />
+      <div className="online-game-top-bar">
+        <button className="action-btn leave-room-btn" onClick={handleLeaveRoom}>
+          ✕ Salir
+        </button>
+      </div>
+
+      {disconnectedPlayers.map(name => (
+        <div key={name} className="disconnected-banner">
+          {name} se desconectó — esperando reconexión...
+        </div>
+      ))}
+
       {!isMyTurn && state.phase !== "gameOver" && (
         <div className="spectator-banner">
           Turno de <strong>{currentPlayerName}</strong> — Solo puedes observar
@@ -107,10 +172,11 @@ function OnlineGameInner({ playerIndex, children }: { playerIndex: number; child
 }
 
 function BackButton() {
+  const { clearReconnect } = useOnline()
   return (
     <button
       className="action-btn"
-      onClick={() => window.location.reload()}
+      onClick={() => { clearReconnect(); window.location.reload() }}
       style={{ position: "fixed", top: 8, left: 8, zIndex: 1000, fontSize: 12, padding: "4px 8px" }}
     >
       Volver al menú

@@ -6,6 +6,9 @@ const wss = new WebSocketServer({ port: PORT })
 const USERS = ["Alianza", "Espias", "Imperio", "Legion", "Luna", "Nasa", "Sol", "Iglecia"]
 
 const rooms = new Map()
+const disconnectTimeouts = new Map()
+
+const DISCONNECT_TIMEOUT = 120_000
 
 function generateId() {
   return Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -16,10 +19,59 @@ function getAvailableUser(players) {
   return USERS.find(u => !taken.includes(u)) || USERS[0]
 }
 
+function broadcast(room, msg, excludeSessionId = null) {
+  for (const p of room.players) {
+    if (!p.ws || p.disconnected) continue
+    if (excludeSessionId && p.sessionId === excludeSessionId) continue
+    if (p.ws.readyState === 1) {
+      p.ws.send(JSON.stringify(msg))
+    }
+  }
+}
+
+function clearDisconnectTimeout(sessionId) {
+  const t = disconnectTimeouts.get(sessionId)
+  if (t) {
+    clearTimeout(t)
+    disconnectTimeouts.delete(sessionId)
+  }
+}
+
+function removePlayerFromRoom(room, sessionId, notifyHost = true) {
+  const idx = room.players.findIndex(p => p.sessionId === sessionId)
+  if (idx === -1) return null
+  const removed = room.players[idx]
+  room.players.splice(idx, 1)
+
+  if (notifyHost && room.lastGameState) {
+    // Notify remaining players that this player should be removed from game
+    broadcast(room, {
+      type: "player_left",
+      sessionId,
+      playerIndex: idx,
+      players: room.players.map(p => ({ sessionId: p.sessionId, name: p.name, user: p.user })),
+    })
+  }
+
+  if (room.players.length === 0) {
+    rooms.delete(room.id)
+    return removed
+  }
+
+  // If host left, transfer host
+  if (sessionId === room.hostSessionId) {
+    room.hostSessionId = room.players[0].sessionId
+    broadcast(room, { type: "new_host", hostSessionId: room.hostSessionId })
+  }
+
+  return removed
+}
+
 wss.on("connection", (ws) => {
   const clientId = generateId()
   let playerName = "Desconocido"
   let roomId = null
+  let sessionId = null
 
   ws.send(JSON.stringify({ type: "connected", clientId }))
 
@@ -33,6 +85,7 @@ wss.on("connection", (ws) => {
 
     switch (msg.type) {
       case "create_room": {
+        sessionId = msg.sessionId || generateId()
         const id = generateId()
         roomId = id
         playerName = msg.playerName || "Anfitrión"
@@ -40,15 +93,17 @@ wss.on("connection", (ws) => {
         const preferredUser = (msg.preferredUser && USERS.includes(msg.preferredUser)) ? msg.preferredUser : USERS[0]
         const room = {
           id,
-          hostId: clientId,
-          players: [{ id: clientId, name: playerName, user: preferredUser }],
+          hostSessionId: sessionId,
+          gameStarted: false,
+          lastGameState: null,
+          players: [{ sessionId, id: clientId, ws, name: playerName, user: preferredUser, disconnected: false }],
         }
         rooms.set(id, room)
 
         ws.send(JSON.stringify({
           type: "room_created",
           roomId: id,
-          players: room.players,
+          players: room.players.map(p => ({ sessionId: p.sessionId, name: p.name, user: p.user })),
         }))
         break
       }
@@ -64,42 +119,86 @@ wss.on("connection", (ws) => {
           return
         }
 
+        sessionId = msg.sessionId || generateId()
         roomId = msg.roomId
         playerName = msg.playerName || "Jugador"
 
         const preferred = msg.preferredUser
         const isFree = preferred && USERS.includes(preferred) && !room.players.some(p => p.user === preferred)
         const newUser = isFree ? preferred : getAvailableUser(room.players)
-        room.players.push({ id: clientId, name: playerName, user: newUser })
+        room.players.push({ sessionId, id: clientId, ws, name: playerName, user: newUser, disconnected: false })
 
         ws.send(JSON.stringify({
           type: "room_joined",
           roomId: msg.roomId,
-          players: room.players,
-          hostId: room.hostId,
+          players: room.players.map(p => ({ sessionId: p.sessionId, name: p.name, user: p.user })),
+          hostSessionId: room.hostSessionId,
         }))
 
-        for (const p of room.players) {
-          if (p.id === clientId) continue
-          const clientWs = [...wss.clients].find((c) => c._clientId === p.id)
-          if (clientWs?.readyState === 1) {
-            clientWs.send(JSON.stringify({
-              type: "player_joined",
-              player: { id: clientId, name: playerName },
-              players: room.players,
-            }))
-          }
+        broadcast(room, {
+          type: "player_joined",
+          player: { sessionId, name: playerName },
+          players: room.players.map(p => ({ sessionId: p.sessionId, name: p.name, user: p.user })),
+        }, sessionId)
+        break
+      }
+
+      case "reconnect": {
+        const room = rooms.get(msg.roomId)
+        if (!room) {
+          ws.send(JSON.stringify({ type: "error", message: "Sala no encontrada" }))
+          return
         }
+
+        const player = room.players.find(p => p.sessionId === msg.sessionId)
+        if (!player) {
+          ws.send(JSON.stringify({ type: "error", message: "Jugador no encontrado en la sala" }))
+          return
+        }
+
+        sessionId = player.sessionId
+        roomId = room.id
+        playerName = player.name
+
+        // Clear disconnect timeout
+        clearDisconnectTimeout(sessionId)
+
+        // Reassign connection
+        player.ws = ws
+        player.id = clientId
+        player.disconnected = false
+
+        const playerIndex = room.players.indexOf(player)
+
+        ws.send(JSON.stringify({
+          type: "reconnected",
+          roomId: room.id,
+          hostSessionId: room.hostSessionId,
+          playerIndex,
+          isHost: room.hostSessionId === sessionId,
+          gameStarted: room.gameStarted,
+          players: room.players.map(p => ({ sessionId: p.sessionId, name: p.name, user: p.user })),
+        }))
+
+        if (room.lastGameState) {
+          ws.send(JSON.stringify({ type: "game_state_update", state: room.lastGameState }))
+        }
+
+        broadcast(room, {
+          type: "player_reconnected",
+          sessionId,
+          name: playerName,
+        }, sessionId)
         break
       }
 
       case "list_rooms": {
         const list = [...rooms.values()]
-          .filter((r) => r.players.length < 8)
+          .filter((r) => r.players.length < 8 && !r.gameStarted)
           .map((r) => ({
             roomId: r.id,
-            hostName: r.players.find((p) => p.id === r.hostId)?.name || "Anfitrión",
-            playerCount: r.players.length,
+            hostName: r.players.find((p) => p.sessionId === r.hostSessionId)?.name || "Anfitrión",
+            playerCount: r.players.filter(p => !p.disconnected).length,
           }))
         ws.send(JSON.stringify({ type: "room_list", rooms: list }))
         break
@@ -107,18 +206,19 @@ wss.on("connection", (ws) => {
 
       case "start_game": {
         const room = rooms.get(roomId)
-        if (!room || room.hostId !== clientId) return
+        if (!room || room.hostSessionId !== sessionId) return
 
-        for (const p of room.players) {
-          const playerIndex = room.players.indexOf(p)
-          const clientWs = [...wss.clients].find((c) => c._clientId === p.id)
-          if (clientWs?.readyState === 1) {
-            clientWs.send(JSON.stringify({
+        room.gameStarted = true
+
+        for (let i = 0; i < room.players.length; i++) {
+          const p = room.players[i]
+          if (p.ws?.readyState === 1) {
+            p.ws.send(JSON.stringify({
               type: "game_started",
               playerConfigs: msg.playerConfigs,
-              hostId: room.hostId,
-              yourPlayerId: p.id,
-              playerIndex,
+              hostSessionId: room.hostSessionId,
+              yourSessionId: p.sessionId,
+              playerIndex: i,
             }))
           }
         }
@@ -129,10 +229,10 @@ wss.on("connection", (ws) => {
         const room = rooms.get(roomId)
         if (!room) return
 
-        const hostWs = [...wss.clients].find((c) => c._clientId === room.hostId)
-        if (hostWs?.readyState === 1) {
-          const senderIndex = room.players.findIndex(p => p.id === clientId)
-          hostWs.send(JSON.stringify({
+        const hostPlayer = room.players.find(p => p.sessionId === room.hostSessionId)
+        if (hostPlayer && hostPlayer.ws?.readyState === 1) {
+          const senderIndex = room.players.findIndex(p => p.sessionId === sessionId)
+          hostPlayer.ws.send(JSON.stringify({
             type: "game_action",
             action: msg.action,
             playerIndex: senderIndex,
@@ -145,11 +245,13 @@ wss.on("connection", (ws) => {
         const room = rooms.get(roomId)
         if (!room) return
 
+        room.lastGameState = msg.state
+
         for (const p of room.players) {
-          if (p.id === room.hostId) continue
-          const clientWs = [...wss.clients].find((c) => c._clientId === p.id)
-          if (clientWs?.readyState === 1) {
-            clientWs.send(JSON.stringify({
+          if (p.sessionId === room.hostSessionId) continue
+          if (!p.ws || p.disconnected) continue
+          if (p.ws.readyState === 1) {
+            p.ws.send(JSON.stringify({
               type: "game_state_update",
               state: msg.state,
             }))
@@ -158,58 +260,49 @@ wss.on("connection", (ws) => {
         break
       }
 
+      case "update_player_user": {
+        const room = rooms.get(roomId)
+        if (!room) return
+        const targetPlayer = room.players.find(p => p.sessionId === msg.playerId)
+        if (!targetPlayer) return
+        if (sessionId !== room.hostSessionId && sessionId !== msg.playerId) return
+        if (!USERS.includes(msg.user)) return
+        const alreadyTaken = room.players.some(p => p.sessionId !== msg.playerId && p.user === msg.user)
+        if (alreadyTaken) return
+        targetPlayer.user = msg.user
+        broadcast(room, {
+          type: "players_updated",
+          players: room.players.map(p => ({ sessionId: p.sessionId, name: p.name, user: p.user })),
+        })
+        break
+      }
+
       case "leave_room": {
         const room = rooms.get(roomId)
         if (!room) return
 
-        room.players = room.players.filter((p) => p.id !== clientId)
-
-        if (room.players.length === 0) {
+        // If host leaves during game, close room for everyone
+        if (sessionId === room.hostSessionId && room.gameStarted) {
+          broadcast(room, { type: "room_closed" })
+          for (const p of room.players) {
+            try { p.ws?.close?.() } catch {}
+          }
           rooms.delete(roomId)
           roomId = null
           return
         }
 
-        for (const p of room.players) {
-          const clientWs = [...wss.clients].find((c) => c._clientId === p.id)
-          if (clientWs?.readyState === 1) {
-            clientWs.send(JSON.stringify({
-              type: "player_left",
-              playerId: clientId,
-              players: room.players,
-            }))
-          }
+        const removed = removePlayerFromRoom(room, sessionId, room.gameStarted)
+        if (removed && !room.gameStarted) {
+          // In lobby, just notify
+          broadcast(room, {
+            type: "player_left",
+            sessionId,
+            players: room.players.map(p => ({ sessionId: p.sessionId, name: p.name, user: p.user })),
+          }, sessionId)
         }
 
-        if (clientId === room.hostId) {
-          room.hostId = room.players[0].id
-          const newHostWs = [...wss.clients].find((c) => c._clientId === room.hostId)
-          if (newHostWs?.readyState === 1) {
-            newHostWs.send(JSON.stringify({ type: "new_host" }))
-          }
-        }
-        break
-      }
-
-      case "update_player_user": {
-        const room = rooms.get(roomId)
-        if (!room) return
-        const targetPlayer = room.players.find(p => p.id === msg.playerId)
-        if (!targetPlayer) return
-        if (clientId !== room.hostId && clientId !== msg.playerId) return
-        if (!USERS.includes(msg.user)) return
-        const alreadyTaken = room.players.some(p => p.id !== msg.playerId && p.user === msg.user)
-        if (alreadyTaken) return
-        targetPlayer.user = msg.user
-        for (const p of room.players) {
-          const clientWs = [...wss.clients].find((c) => c._clientId === p.id)
-          if (clientWs?.readyState === 1) {
-            clientWs.send(JSON.stringify({
-              type: "players_updated",
-              players: room.players,
-            }))
-          }
-        }
+        roomId = null
         break
       }
     }
@@ -220,32 +313,55 @@ wss.on("connection", (ws) => {
     const room = rooms.get(roomId)
     if (!room) return
 
-    const disconnectedIndex = room.players.findIndex(p => p.id === clientId)
-    room.players = room.players.filter((p) => p.id !== clientId)
+    const player = room.players.find(p => p.id === clientId)
+    if (!player) return
 
-    if (room.players.length === 0) {
-      rooms.delete(roomId)
-      return
+    // Mark as disconnected but don't remove
+    player.disconnected = true
+    player.ws = null
+    player.id = null
+
+    // Notify others
+    const playerIndex = room.players.indexOf(player)
+
+    if (room.gameStarted) {
+      broadcast(room, {
+        type: "player_disconnected",
+        sessionId: player.sessionId,
+        playerIndex,
+        name: player.name,
+      })
+    } else {
+      // In lobby, just notify players list change
+      broadcast(room, {
+        type: "player_left",
+        sessionId: player.sessionId,
+        players: room.players.filter(p => !p.disconnected).map(p => ({ sessionId: p.sessionId, name: p.name, user: p.user })),
+      })
     }
 
-    for (const p of room.players) {
-      const clientWs = [...wss.clients].find((c) => c._clientId === p.id)
-      if (clientWs?.readyState === 1) {
-        clientWs.send(JSON.stringify({
-          type: "player_disconnected",
-          playerIndex: disconnectedIndex,
-          players: room.players,
-        }))
+    // Set timeout to auto-remove if player doesn't reconnect
+    const timeout = setTimeout(() => {
+      const r = rooms.get(roomId)
+      if (!r) return
+      const p = r.players.find(p => p.sessionId === player.sessionId)
+      if (!p || !p.disconnected) return
+
+      // If host disconnected and timed out, close room
+      if (player.sessionId === room.hostSessionId) {
+        broadcast(r, { type: "room_closed", reason: "El anfitrión no se reconectó" })
+        for (const pl of r.players) {
+          try { pl.ws?.close?.() } catch {}
+        }
+        rooms.delete(roomId)
+      } else {
+        // Remove player from game
+        removePlayerFromRoom(r, player.sessionId, r.gameStarted)
       }
-    }
+      disconnectTimeouts.delete(player.sessionId)
+    }, DISCONNECT_TIMEOUT)
 
-    if (clientId === room.hostId) {
-      room.hostId = room.players[0].id
-      const newHostWs = [...wss.clients].find((c) => c._clientId === room.hostId)
-      if (newHostWs?.readyState === 1) {
-        newHostWs.send(JSON.stringify({ type: "new_host" }))
-      }
-    }
+    disconnectTimeouts.set(player.sessionId, timeout)
   })
 
   ws._clientId = clientId

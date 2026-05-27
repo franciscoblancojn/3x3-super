@@ -8,7 +8,7 @@ import "./online.css"
 type LobbyScreen =
   | { type: "menu" }
   | { type: "join_list" }
-  | { type: "in_room"; players: { id: string; name: string; user: string }[]; roomId: string; isHost: boolean }
+  | { type: "in_room"; players: { sessionId: string; name: string; user: string }[]; roomId: string; isHost: boolean }
 
 const ALL_USERS = Object.values(IUsers)
 const LS_KEY = "game_preferred_user"
@@ -30,7 +30,7 @@ function saveUser(user: string) {
   }
 }
 
-function normalizePlayers(players: { id: string; name: string; user?: string }[]): { id: string; name: string; user: string }[] {
+function normalizePlayers(players: { sessionId: string; name: string; user?: string }[]): { sessionId: string; name: string; user: string }[] {
   return players.map((p, i) => ({
     ...p,
     user: (p.user && ALL_USERS.includes(p.user as IUsers)) ? p.user : ALL_USERS[i % ALL_USERS.length],
@@ -46,15 +46,23 @@ export function OnlineLobby({
   onBack: () => void
   onGameStarted: (isHost: boolean, configs?: { name: string; user: string }[], playerIndex?: number) => void
 }) {
-  const { connected, send, subscribe, clientId } = useOnline()
+  const { connected, send, subscribe, sessionId, saveReconnect, clearReconnect } = useOnline()
   const [screen, setScreen] = useState<LobbyScreen>({ type: "menu" })
   const [rooms, setRooms] = useState<{ roomId: string; hostName: string; playerCount: number }[]>([])
   const [error, setError] = useState<string | null>(null)
+  const roomIdRef = useRef("")
 
   const onGameStartedRef = useRef(onGameStarted)
   useEffect(() => {
     onGameStartedRef.current = onGameStarted
   })
+
+  // Keep roomIdRef updated whenever screen changes
+  useEffect(() => {
+    if (screen.type === "in_room") {
+      roomIdRef.current = screen.roomId
+    }
+  }, [screen])
 
   useEffect(() => {
     return subscribe((msg) => {
@@ -62,7 +70,7 @@ export function OnlineLobby({
         case "room_created": {
           setScreen({
             type: "in_room",
-            players: normalizePlayers(msg.players as { id: string; name: string; user?: string }[]),
+            players: normalizePlayers(msg.players as { sessionId: string; name: string; user?: string }[]),
             roomId: msg.roomId as string,
             isHost: true,
           })
@@ -71,7 +79,7 @@ export function OnlineLobby({
         case "room_joined": {
           setScreen({
             type: "in_room",
-            players: normalizePlayers(msg.players as { id: string; name: string; user?: string }[]),
+            players: normalizePlayers(msg.players as { sessionId: string; name: string; user?: string }[]),
             roomId: msg.roomId as string,
             isHost: false,
           })
@@ -84,10 +92,9 @@ export function OnlineLobby({
         case "player_joined": {
           setScreen((prev) => {
             if (prev.type !== "in_room") return prev
-            // Merge incoming players, preserving current selections
-            const incoming = (msg.players as { id: string; name: string; user?: string }[])
+            const incoming = (msg.players as { sessionId: string; name: string; user?: string }[])
             const merged = incoming.map((p, i) => {
-              const existing = prev.players.find(ep => ep.id === p.id)
+              const existing = prev.players.find(ep => ep.sessionId === p.sessionId)
               return {
                 ...p,
                 user: existing?.user ?? ((p.user && ALL_USERS.includes(p.user as IUsers)) ? p.user : ALL_USERS[i % ALL_USERS.length]),
@@ -100,7 +107,7 @@ export function OnlineLobby({
         case "player_left": {
           setScreen((prev) => {
             if (prev.type !== "in_room") return prev
-            return { ...prev, players: normalizePlayers(msg.players as { id: string; name: string; user?: string }[]) }
+            return { ...prev, players: normalizePlayers(msg.players as { sessionId: string; name: string; user?: string }[]) }
           })
           break
         }
@@ -114,15 +121,28 @@ export function OnlineLobby({
         case "players_updated": {
           setScreen((prev) => {
             if (prev.type !== "in_room") return prev
-            return { ...prev, players: normalizePlayers(msg.players as { id: string; name: string; user?: string }[]) }
+            return { ...prev, players: normalizePlayers(msg.players as { sessionId: string; name: string; user?: string }[]) }
           })
           break
         }
         case "game_started": {
-          const isHost = msg.hostId === msg.yourPlayerId
+          const isHost = msg.hostSessionId === msg.yourSessionId
           const configs = msg.playerConfigs as { name: string; user: string }[] | undefined
           const playerIndex = msg.playerIndex as number
+          saveReconnect({
+            roomId: roomIdRef.current,
+            sessionId,
+            playerName,
+            isHost,
+            playerIndex,
+            configs: configs || [],
+          })
           onGameStartedRef.current(isHost, configs, playerIndex)
+          break
+        }
+        case "room_closed": {
+          clearReconnect()
+          setScreen({ type: "menu" })
           break
         }
         case "error": {
@@ -132,32 +152,33 @@ export function OnlineLobby({
         }
       }
     })
-  }, [subscribe])
+  }, [subscribe, sessionId, saveReconnect, clearReconnect, playerName])
 
   function handleCreateRoom() {
     const preferredUser = getSavedUser()
-    send({ type: "create_room", playerName, ...(preferredUser ? { preferredUser } : {}) })
+    send({ type: "create_room", playerName, sessionId, ...(preferredUser ? { preferredUser } : {}) })
   }
 
   function handleJoinRoom(roomId: string) {
     const preferredUser = getSavedUser()
-    send({ type: "join_room", roomId, playerName, ...(preferredUser ? { preferredUser } : {}) })
+    send({ type: "join_room", roomId, playerName, sessionId, ...(preferredUser ? { preferredUser } : {}) })
   }
 
   function handleLeaveRoom() {
     send({ type: "leave_room" })
+    clearReconnect()
     setScreen({ type: "menu" })
   }
 
-  function handleUserChange(playerId: string, newUser: string) {
-    if (playerId === clientId) {
+  function handleUserChange(playerSessionId: string, newUser: string) {
+    if (playerSessionId === sessionId) {
       saveUser(newUser)
     }
     setScreen((prev) => {
       if (prev.type !== "in_room") return prev
-      return { ...prev, players: prev.players.map(p => p.id === playerId ? { ...p, user: newUser } : p) }
+      return { ...prev, players: prev.players.map(p => p.sessionId === playerSessionId ? { ...p, user: newUser } : p) }
     })
-    send({ type: "update_player_user", playerId, user: newUser })
+    send({ type: "update_player_user", playerId: playerSessionId, user: newUser })
   }
 
   function handleBack() {
@@ -193,15 +214,15 @@ export function OnlineLobby({
             <h3>Jugadores conectados ({screen.players.length})</h3>
             <div className="room-players-list">
               {screen.players.map((p, i) => {
-                const canEdit = screen.isHost || clientId === p.id
+                const canEdit = screen.isHost || sessionId === p.sessionId
                 return (
-                  <div key={p.id} className="room-player-row">
+                  <div key={p.sessionId} className="room-player-row">
                     <Ficha {...FICHAS_SIN_EFECTO[0]} variation={FICHAS_SIN_EFECTO[0].variations[0]} user={p.user as IUsers} />
                     <span>{p.name}</span>
                     {canEdit ? (
-                      <select value={p.user} onChange={e => handleUserChange(p.id, e.target.value)} className="room-user-select">
+                      <select value={p.user} onChange={e => handleUserChange(p.sessionId, e.target.value)} className="room-user-select">
                         {Object.values(IUsers).map(u => {
-                          const taken = u !== p.user && screen.players.some(op => op.id !== p.id && op.user === u)
+                          const taken = u !== p.user && screen.players.some(op => op.sessionId !== p.sessionId && op.user === u)
                           return (
                             <option key={u} value={u} disabled={taken}>
                               {u} {taken ? "(ocupado)" : ""}

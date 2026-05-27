@@ -233,6 +233,47 @@
   border: 1px solid var(--border);
 }
 
+.online-game-top-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.5rem;
+  pointer-events: none;
+}
+
+.leave-room-btn {
+  pointer-events: auto;
+  background: #dc3545 !important;
+  color: white !important;
+  border: none;
+  font-size: 0.8rem !important;
+  padding: 0.3rem 0.7rem !important;
+  opacity: 0.85;
+  transition: opacity 0.2s;
+}
+
+.leave-room-btn:hover {
+  opacity: 1;
+}
+
+.disconnected-banner {
+  position: fixed;
+  top: 40px;
+  left: 0;
+  right: 0;
+  z-index: 999;
+  background: rgba(255, 193, 7, 0.92);
+  color: #212529;
+  text-align: center;
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+  border-bottom: 2px solid #ffc107;
+}
+
 .spectator-banner {
   position: fixed;
   top: 0;
