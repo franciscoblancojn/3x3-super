@@ -62,13 +62,6 @@ export function GameSetup() {
     setPlayers(prev => prev.map((p, i) => i === index ? { ...p, user: newUser } : p))
   }
 
-  function getAvailableUsers(currentIndex: number): IUsers[] {
-    const taken = players
-      .filter((_, i) => i !== currentIndex)
-      .map(p => p.user)
-    return ALL_USERS.filter(u => !taken.includes(u))
-  }
-
   function handleStart() {
     const rawConfigs = players.slice(0, playerCount).map((p, i) => ({
       name: p.name || `Jugador ${i + 1}`,

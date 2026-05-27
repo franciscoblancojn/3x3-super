@@ -64,7 +64,7 @@ export function OnlineRouter({ playerName, onBack }: { playerName: string; onBac
 }
 
 function ReconnectGame({ playerName }: { playerName: string }) {
-  const { connected, send, subscribe, lastGameState, saveReconnect, clearReconnect, sessionId, setReconnecting } = useOnline()
+  const { connected, send, subscribe, lastGameState, saveReconnect, clearReconnect, setReconnecting } = useOnline()
   const [status, setStatus] = useState<"connecting" | "reconnecting" | "reconnected" | "error">("connecting")
   const [errorMsg, setErrorMsg] = useState("")
   const [reconnectData, setReconnectData] = useState<{
@@ -213,7 +213,6 @@ function ReconnectGame({ playerName }: { playerName: string }) {
 
 function LeaveGame({ playerName: _playerName, onDone }: { playerName: string; onDone: () => void }) {
   const { connected, send, subscribe, clearReconnect } = useOnline()
-  const [status, setStatus] = useState("connecting")
 
   useEffect(() => {
     if (!connected) return
@@ -225,7 +224,6 @@ function LeaveGame({ playerName: _playerName, onDone }: { playerName: string; on
       return
     }
 
-    setStatus("leaving")
     send({ type: "reconnect", roomId: info.roomId, sessionId: info.sessionId, playerName: info.playerName })
   }, [connected, send, clearReconnect, onDone])
 

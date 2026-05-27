@@ -12,6 +12,7 @@ const SIN_EFECTO_FICHA = {
   action: IAction.SIN_EFECTO,
   variations: [EMPTY_VARIATION],
   decription: "",
+  haveRotate: false,
 }
 
 export function GameBoard({ playerIndex: myPlayerIndex }: { playerIndex?: number }) {

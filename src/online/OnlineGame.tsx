@@ -174,19 +174,6 @@ function OnlineGameInner({ playerIndex, children }: { playerIndex: number; child
   )
 }
 
-function BackButton() {
-  const { clearReconnect } = useOnline()
-  return (
-    <button
-      className="action-btn"
-      onClick={() => { clearReconnect(); window.location.reload() }}
-      style={{ position: "fixed", top: 8, left: 8, zIndex: 1000, fontSize: 12, padding: "4px 8px" }}
-    >
-      Volver al menú
-    </button>
-  )
-}
-
 export function OnlineHostGame({ configs, playerIndex, initialState }: { configs: { name: string; user: import("../interface/users").IUsers }[]; playerIndex: number; initialState?: import("../game/types").GameState }) {
   return (
     <GameProvider initialState={initialState}>

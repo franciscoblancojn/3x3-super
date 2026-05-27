@@ -1,7 +1,7 @@
 import { IUsers } from "../interface/users"
 import { IPowers } from "../interface/powers"
 import { FICHAS_MANO, FICHAS_ACTIVACION, FICHAS_DESTRUCCION, FICHAS_INSTANTANEA, FICHAS_TURNO, FICHAS_SIN_EFECTO } from "../data/fichas"
-import type { GameState, GameAction, PlayerState, BoardGrid, HandPiece, Position, PendingEffect, TurnEffectSource } from "./types"
+import type { GameState, GameAction, PlayerState, BoardGrid, BoardCell, HandPiece, Position, PendingEffect, TurnEffectSource } from "./types"
 
 const BOARD_SIZE = 7
 const MAX_HAND_SIZE = 3
@@ -218,11 +218,6 @@ function findAllThreeInLine(board: BoardGrid): { positions: Position[]; user: IU
   return result
 }
 
-function findThreeInLine(board: BoardGrid): { positions: Position[]; user: IUsers } | null {
-  const all = findAllThreeInLine(board)
-  return all.length > 0 ? all[0] : null
-}
-
 function pushAllPiecesInDirection(
   board: BoardGrid, dr: number, dc: number
 ): { piecesToMove: { from: Position; to: Position }[] } {
@@ -315,19 +310,6 @@ function getAllNonEmptyCells(board: BoardGrid): Position[] {
     }
   }
   return cells
-}
-
-function getAdjacentEnemyCells(board: BoardGrid, row: number, col: number, myUser: IUsers, dirs: { dr: number; dc: number }[]): Position[] {
-  const result: Position[] = []
-  for (const d of dirs) {
-    const nr = row + d.dr, nc = col + d.dc
-    if (nr < 0 || nr >= 7 || nc < 0 || nc >= 7) continue
-    const cell = board[nr][nc]
-    if (cell && !cell.isWall && cell.user !== myUser) {
-      result.push({ row: nr, col: nc })
-    }
-  }
-  return result
 }
 
 function buildInstantEffects(
