@@ -182,7 +182,7 @@ function ReconnectGame({ playerName }: { playerName: string }) {
 
   if (reconnectData && status === "reconnected" && lastGameState) {
     if (reconnectData.isHost) {
-      return <OnlineHostGame configs={reconnectData.configs as { name: string; user: IUsers }[]} playerIndex={reconnectData.playerIndex} />
+      return <OnlineHostGame configs={reconnectData.configs as { name: string; user: IUsers }[]} playerIndex={reconnectData.playerIndex} initialState={lastGameState} />
     } else {
       return <OnlineClientGame playerIndex={reconnectData.playerIndex} />
     }

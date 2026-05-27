@@ -13,12 +13,18 @@ export function GameProvider({
   children,
   externalState,
   externalDispatch,
+  initialState,
 }: {
   children: ReactNode
   externalState?: GameState
   externalDispatch?: React.Dispatch<GameAction>
+  initialState?: GameState
 }) {
-  const [localState, localDispatch] = useReducer(gameReducer, null, createInitialState)
+  const [localState, localDispatch] = useReducer(
+    gameReducer,
+    initialState ?? null,
+    initialState ? () => initialState : createInitialState
+  )
   const state = externalState ?? localState
   const dispatch = externalDispatch ?? localDispatch
   return (

@@ -16,7 +16,10 @@ function HostSync({ configs }: { configs: { name: string; user: import("../inter
   useEffect(() => {
     if (!started.current) {
       started.current = true
-      dispatch({ type: "START_GAME", playerConfigs: configs })
+      // Don't dispatch START_GAME if game already has state (reconnection)
+      if (state.phase === "setup") {
+        dispatch({ type: "START_GAME", playerConfigs: configs })
+      }
       // Save reconnect info for host (OnlineLobby may unmount before game_started arrives)
       const rid = roomId || loadReconnectInfo()?.roomId || "unknown"
       saveReconnect({
@@ -28,7 +31,7 @@ function HostSync({ configs }: { configs: { name: string; user: import("../inter
         configs: configs.map(c => ({ name: c.name, user: c.user })),
       })
     }
-  }, [dispatch, configs, sessionId, saveReconnect, roomId])
+  }, [dispatch, configs, sessionId, saveReconnect, roomId, state.phase])
 
   useEffect(() => {
     return subscribe((msg) => {
@@ -184,9 +187,9 @@ function BackButton() {
   )
 }
 
-export function OnlineHostGame({ configs, playerIndex }: { configs: { name: string; user: import("../interface/users").IUsers }[]; playerIndex: number }) {
+export function OnlineHostGame({ configs, playerIndex, initialState }: { configs: { name: string; user: import("../interface/users").IUsers }[]; playerIndex: number; initialState?: import("../game/types").GameState }) {
   return (
-    <GameProvider>
+    <GameProvider initialState={initialState}>
       <HostSync configs={configs} />
       <OnlineGameInner playerIndex={playerIndex}>
         <GameBoard playerIndex={playerIndex} />
