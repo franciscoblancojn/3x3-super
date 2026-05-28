@@ -9,7 +9,8 @@
   },
   "scripts": {
     "dev": "bash -c 'source ~/.nvm/nvm.sh && nvm use && bash bin/dev.sh'",
-    "build": "~/.nvm/nvm-exec tsc -b && ~/.nvm/nvm-exec vite build",
+    "build": "vite build",
+    "build-local": "~/.nvm/nvm-exec tsc -b && ~/.nvm/nvm-exec vite build",
     "lint": "~/.nvm/nvm-exec eslint .",
     "preview": "~/.nvm/nvm-exec vite preview"
   },
