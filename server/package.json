@@ -1,0 +1,11 @@
+{
+  "name": "game-3x3-super-server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "ws": "^8.20.1"
+  }
+}

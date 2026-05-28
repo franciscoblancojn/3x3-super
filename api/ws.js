@@ -1,7 +1,6 @@
-import { WebSocketServer } from "ws"
-
-const PORT = Number(process.env.PORT || process.env.WS_PORT) || 3001
-const wss = new WebSocketServer({ port: PORT })
+export const config = {
+  runtime: 'edge',
+}
 
 const USERS = ["Alianza", "Espias", "Imperio", "Legion", "Luna", "Nasa", "Sol", "Iglecia"]
 
@@ -44,7 +43,6 @@ function removePlayerFromRoom(room, sessionId, notifyHost = true) {
   room.players.splice(idx, 1)
 
   if (notifyHost && room.lastGameState) {
-    // Notify remaining players that this player should be removed from game
     broadcast(room, {
       type: "player_left",
       sessionId,
@@ -58,7 +56,6 @@ function removePlayerFromRoom(room, sessionId, notifyHost = true) {
     return removed
   }
 
-  // If host left, transfer host
   if (sessionId === room.hostSessionId) {
     room.hostSessionId = room.players[0].sessionId
     broadcast(room, { type: "new_host", hostSessionId: room.hostSessionId })
@@ -67,18 +64,28 @@ function removePlayerFromRoom(room, sessionId, notifyHost = true) {
   return removed
 }
 
-wss.on("connection", (ws) => {
+export default async (request) => {
+  const upgradeHeader = request.headers.get('upgrade')
+  if (!upgradeHeader || upgradeHeader.toLowerCase() !== 'websocket') {
+    return new Response('Expected WebSocket upgrade', { status: 426 })
+  }
+
+  const pair = new WebSocketPair()
+  const [client, server] = Object.values(pair)
+
+  server.accept()
+
   const clientId = generateId()
   let playerName = "Desconocido"
   let roomId = null
   let sessionId = null
 
-  ws.send(JSON.stringify({ type: "connected", clientId }))
+  server.send(JSON.stringify({ type: "connected", clientId }))
 
-  ws.on("message", (raw) => {
+  server.addEventListener("message", (event) => {
     let msg
     try {
-      msg = JSON.parse(raw.toString())
+      msg = JSON.parse(event.data)
     } catch {
       return
     }
@@ -96,11 +103,11 @@ wss.on("connection", (ws) => {
           hostSessionId: sessionId,
           gameStarted: false,
           lastGameState: null,
-          players: [{ sessionId, id: clientId, ws, name: playerName, user: preferredUser, disconnected: false }],
+          players: [{ sessionId, id: clientId, ws: server, name: playerName, user: preferredUser, disconnected: false }],
         }
         rooms.set(id, room)
 
-        ws.send(JSON.stringify({
+        server.send(JSON.stringify({
           type: "room_created",
           roomId: id,
           players: room.players.map(p => ({ sessionId: p.sessionId, name: p.name, user: p.user })),
@@ -111,11 +118,11 @@ wss.on("connection", (ws) => {
       case "join_room": {
         const room = rooms.get(msg.roomId)
         if (!room) {
-          ws.send(JSON.stringify({ type: "error", message: "Sala no encontrada" }))
+          server.send(JSON.stringify({ type: "error", message: "Sala no encontrada" }))
           return
         }
         if (room.players.length >= 8) {
-          ws.send(JSON.stringify({ type: "error", message: "Sala llena" }))
+          server.send(JSON.stringify({ type: "error", message: "Sala llena" }))
           return
         }
 
@@ -126,9 +133,9 @@ wss.on("connection", (ws) => {
         const preferred = msg.preferredUser
         const isFree = preferred && USERS.includes(preferred) && !room.players.some(p => p.user === preferred)
         const newUser = isFree ? preferred : getAvailableUser(room.players)
-        room.players.push({ sessionId, id: clientId, ws, name: playerName, user: newUser, disconnected: false })
+        room.players.push({ sessionId, id: clientId, ws: server, name: playerName, user: newUser, disconnected: false })
 
-        ws.send(JSON.stringify({
+        server.send(JSON.stringify({
           type: "room_joined",
           roomId: msg.roomId,
           players: room.players.map(p => ({ sessionId: p.sessionId, name: p.name, user: p.user })),
@@ -146,13 +153,13 @@ wss.on("connection", (ws) => {
       case "reconnect": {
         const room = rooms.get(msg.roomId)
         if (!room) {
-          ws.send(JSON.stringify({ type: "error", message: "Sala no encontrada" }))
+          server.send(JSON.stringify({ type: "error", message: "Sala no encontrada" }))
           return
         }
 
         const player = room.players.find(p => p.sessionId === msg.sessionId)
         if (!player) {
-          ws.send(JSON.stringify({ type: "error", message: "Jugador no encontrado en la sala" }))
+          server.send(JSON.stringify({ type: "error", message: "Jugador no encontrado en la sala" }))
           return
         }
 
@@ -160,17 +167,15 @@ wss.on("connection", (ws) => {
         roomId = room.id
         playerName = player.name
 
-        // Clear disconnect timeout
         clearDisconnectTimeout(sessionId)
 
-        // Reassign connection
-        player.ws = ws
+        player.ws = server
         player.id = clientId
         player.disconnected = false
 
         const playerIndex = room.players.indexOf(player)
 
-        ws.send(JSON.stringify({
+        server.send(JSON.stringify({
           type: "reconnected",
           roomId: room.id,
           hostSessionId: room.hostSessionId,
@@ -181,7 +186,7 @@ wss.on("connection", (ws) => {
         }))
 
         if (room.lastGameState) {
-          ws.send(JSON.stringify({ type: "game_state_update", state: room.lastGameState }))
+          server.send(JSON.stringify({ type: "game_state_update", state: room.lastGameState }))
         }
 
         broadcast(room, {
@@ -200,7 +205,7 @@ wss.on("connection", (ws) => {
             hostName: r.players.find((p) => p.sessionId === r.hostSessionId)?.name || "Anfitrión",
             playerCount: r.players.filter(p => !p.disconnected).length,
           }))
-        ws.send(JSON.stringify({ type: "room_list", rooms: list }))
+        server.send(JSON.stringify({ type: "room_list", rooms: list }))
         break
       }
 
@@ -281,7 +286,6 @@ wss.on("connection", (ws) => {
         const room = rooms.get(roomId)
         if (!room) return
 
-        // If host leaves during game, close room for everyone
         if (sessionId === room.hostSessionId && room.gameStarted) {
           broadcast(room, { type: "room_closed" })
           for (const p of room.players) {
@@ -294,7 +298,6 @@ wss.on("connection", (ws) => {
 
         const removed = removePlayerFromRoom(room, sessionId, room.gameStarted)
         if (removed && !room.gameStarted) {
-          // In lobby, just notify
           broadcast(room, {
             type: "player_left",
             sessionId,
@@ -308,7 +311,7 @@ wss.on("connection", (ws) => {
     }
   })
 
-  ws.on("close", () => {
+  server.addEventListener("close", () => {
     if (!roomId) return
     const room = rooms.get(roomId)
     if (!room) return
@@ -316,12 +319,10 @@ wss.on("connection", (ws) => {
     const player = room.players.find(p => p.id === clientId)
     if (!player) return
 
-    // Mark as disconnected but don't remove
     player.disconnected = true
     player.ws = null
     player.id = null
 
-    // Notify others
     const playerIndex = room.players.indexOf(player)
 
     if (room.gameStarted) {
@@ -332,7 +333,6 @@ wss.on("connection", (ws) => {
         name: player.name,
       })
     } else {
-      // In lobby, just notify players list change
       broadcast(room, {
         type: "player_left",
         sessionId: player.sessionId,
@@ -340,14 +340,12 @@ wss.on("connection", (ws) => {
       })
     }
 
-    // Set timeout to auto-remove if player doesn't reconnect
     const timeout = setTimeout(() => {
       const r = rooms.get(roomId)
       if (!r) return
       const p = r.players.find(p => p.sessionId === player.sessionId)
       if (!p || !p.disconnected) return
 
-      // If host disconnected and timed out, close room
       if (player.sessionId === room.hostSessionId) {
         broadcast(r, { type: "room_closed", reason: "El anfitrión no se reconectó" })
         for (const pl of r.players) {
@@ -355,7 +353,6 @@ wss.on("connection", (ws) => {
         }
         rooms.delete(roomId)
       } else {
-        // Remove player from game
         removePlayerFromRoom(r, player.sessionId, r.gameStarted)
       }
       disconnectTimeouts.delete(player.sessionId)
@@ -364,7 +361,5 @@ wss.on("connection", (ws) => {
     disconnectTimeouts.set(player.sessionId, timeout)
   })
 
-  ws._clientId = clientId
-})
-
-console.log(`🌐 Servidor WebSocket corriendo en puerto ${PORT}`)
+  return new Response(null, { status: 101, webSocket: client })
+}
