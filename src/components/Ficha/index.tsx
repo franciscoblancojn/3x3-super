@@ -11,14 +11,26 @@ export interface FichaProps extends IFicha {
     useImg?: boolean
 }
 
+function resolveSvg(raw: string): string {
+    if (raw?.startsWith('data:image/svg+xml,')) {
+        return decodeURIComponent(raw.slice('data:image/svg+xml,'.length));
+    }
+    return raw || ''
+}
+
 export const Ficha = ({ useImg = false, power, variation, user, back = false }: FichaProps) => {
     const USERS = import.meta.glob('/src/assets/users/*.svg', {
         as: 'raw',
         eager: true,
         import: 'default'
     });
-    const getImg = (svg: any) => {
-        return useImg ? `<img src="data:image/svg+xml;utf8,${encodeURIComponent(`${svg}`.replaceAll("currentColor",IUsersColors[user]))}"/>` : svg;
+    const getImg = (svg: string) => {
+        const raw = resolveSvg(svg as string)
+        if (useImg) {
+            const colored = raw.replaceAll("currentColor", IUsersColors[user]);
+            return `<img src="data:image/svg+xml;utf8,${encodeURIComponent(colored)}"/>`;
+        }
+        return raw;
     }
     const USER_ITEM = USERS[`/src/assets/users/${user}.svg`];
     const USERS_SVG = getImg(USER_ITEM);

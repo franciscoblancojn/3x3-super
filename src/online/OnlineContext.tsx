@@ -83,7 +83,7 @@ export function OnlineProvider({ children, url }: { children: ReactNode; url?: s
   const reconnectInfoRef = useRef(loadReconnectInfo())
 
   useEffect(() => {
-    const wsUrl = url || `/ws`
+    const wsUrl = url || import.meta.env.VITE_WS_URL || `/ws`
     const ws = new WebSocket(wsUrl)
     wsRef.current = ws
 
